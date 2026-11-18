@@ -139,14 +139,18 @@ export async function executeAiTool(
 
   switch (toolName) {
     case "get_today_schedule": {
-      const today = new Date();
-      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const istDate = new Date(Date.now() + istOffset);
+      const dayOfWeek = istDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
+      const hours = String(istDate.getUTCHours()).padStart(2, "0");
+      const minutes = String(istDate.getUTCMinutes()).padStart(2, "0");
+      const currentTimeIST = `${hours}:${minutes}`;
 
       // Check for holiday
-      const startOfDay = new Date(today);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(today);
-      endOfDay.setHours(23, 59, 59, 999);
+      const startOfDay = new Date(istDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(istDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
 
       const holiday = await AcademicEvent.findOne({
         userId: userObjectId,
@@ -158,6 +162,7 @@ export async function executeAiTool(
         return {
           isHoliday: true,
           holidayTitle: holiday.title,
+          currentTimeIST,
           message: `Today is an academic holiday: "${holiday.title}". No regular classes scheduled.`,
         };
       }
@@ -172,9 +177,35 @@ export async function executeAiTool(
 
       const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+      const currentSlot = slots.find(
+        (s: any) => s.timeSlot.startTime <= currentTimeIST && s.timeSlot.endTime >= currentTimeIST
+      );
+      const nextSlot = slots.find(
+        (s: any) => s.timeSlot.startTime > currentTimeIST
+      );
+
       return {
         day: dayNames[dayOfWeek],
-        date: today.toISOString().split("T")[0],
+        date: istDate.toISOString().split("T")[0],
+        currentTimeIST,
+        currentClass: currentSlot
+          ? {
+              code: (currentSlot as any).subjectId?.code || "Unknown",
+              name: (currentSlot as any).subjectId?.name || "Unknown",
+              time: `${currentSlot.timeSlot.startTime} - ${currentSlot.timeSlot.endTime}`,
+              room: currentSlot.room || "TBA",
+              type: currentSlot.type,
+            }
+          : null,
+        nextClass: nextSlot
+          ? {
+              code: (nextSlot as any).subjectId?.code || "Unknown",
+              name: (nextSlot as any).subjectId?.name || "Unknown",
+              time: `${nextSlot.timeSlot.startTime} - ${nextSlot.timeSlot.endTime}`,
+              room: nextSlot.room || "TBA",
+              type: nextSlot.type,
+            }
+          : null,
         totalClasses: slots.length,
         classes: slots.map((s: any) => ({
           subjectCode: s.subjectId?.code || "Unknown",

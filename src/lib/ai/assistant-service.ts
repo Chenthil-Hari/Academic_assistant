@@ -82,7 +82,8 @@ CRITICAL RULES:
 4. When answering questions about attendance, cite exact figures: Conducted, Attended, Absent, and Percentage.
 5. If ${studentName} asks "Can I miss a class?" or "How many classes must I attend?", call calculate_bunk_and_targets.
 6. If ${studentName} asks about their uploaded timetable or calendar PDF, document contents, or what was extracted from their files, call get_uploaded_document_details to inspect the uploaded records and answer accurately.
-7. Format key items in **bold**.
+7. If asked "what is the class now", "current class", or "what class do I have now", call get_today_schedule. If there is an active running class, state: "Right now at <Time>, you have **<Subject>** in **<Room>**." If no class is running right now, state when the next class starts, or that classes for today are complete.
+8. Format key items in **bold**.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
