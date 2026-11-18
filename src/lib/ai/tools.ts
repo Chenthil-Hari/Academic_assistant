@@ -1,0 +1,439 @@
+import connectToDatabase from "@/lib/db/connection";
+import { Subject } from "@/lib/db/models/Subject";
+import { Timetable } from "@/lib/db/models/Timetable";
+import { Attendance } from "@/lib/db/models/Attendance";
+import { AcademicEvent } from "@/lib/db/models/AcademicEvent";
+import { User } from "@/lib/db/models/User";
+import {
+  calculateSubjectMetrics,
+  calculateOverallMetrics,
+  calculateClassesNeeded,
+  calculateMaxClassesCanMiss,
+} from "@/lib/attendance/calculations";
+import mongoose from "mongoose";
+
+export const AI_TOOLS_DEFINITIONS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "get_today_schedule",
+      description: "Get the authenticated user's classes scheduled for today, including times, subjects, and rooms.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_subject_attendance",
+      description: "Get attendance statistics (percentage, conducted, attended, absent, safe/warning status) for a specific subject or all subjects.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Subject code or name (e.g., 'DBMS', 'CS101', 'Math'). If omitted, returns all subjects.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "calculate_bunk_and_targets",
+      description: "Calculate how many classes a user can safely miss or how many they must attend to reach a target attendance percentage.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Subject code or name. If omitted, calculates for overall attendance.",
+          },
+          targetPercentage: {
+            type: "number",
+            description: "Target attendance percentage (e.g. 75, 80). If omitted, uses user's configured target.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_lowest_attendance_subject",
+      description: "Identify the subject that currently has the lowest attendance percentage.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_upcoming_academic_events",
+      description: "Retrieve upcoming exams, assignment deadlines, holidays, and academic calendar events.",
+      parameters: {
+        type: "object",
+        properties: {
+          daysAhead: {
+            type: "number",
+            description: "Number of days in future to look for events (default 30).",
+          },
+          eventType: {
+            type: "string",
+            enum: ["Exam", "Assignment", "Holiday", "Event", "All"],
+            description: "Filter by type of event.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_weekly_timetable",
+      description: "Retrieve the full weekly timetable schedule of classes for all days (Monday through Saturday).",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+];
+
+/**
+ * Executes a deterministic tool call against MongoDB with authenticated user isolation
+ */
+export async function executeAiTool(
+  toolName: string,
+  args: any,
+  userId: string
+): Promise<any> {
+  await connectToDatabase();
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+
+  switch (toolName) {
+    case "get_today_schedule": {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+
+      // Check for holiday
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const holiday = await AcademicEvent.findOne({
+        userId: userObjectId,
+        isHoliday: true,
+        date: { $gte: startOfDay, $lte: endOfDay },
+      });
+
+      if (holiday) {
+        return {
+          isHoliday: true,
+          holidayTitle: holiday.title,
+          message: `Today is an academic holiday: "${holiday.title}". No regular classes scheduled.`,
+        };
+      }
+
+      const slots = await Timetable.find({
+        userId: userObjectId,
+        dayOfWeek,
+        isActive: true,
+      })
+        .populate("subjectId", "code name color room faculty")
+        .sort({ "timeSlot.startTime": 1 });
+
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+      return {
+        day: dayNames[dayOfWeek],
+        date: today.toISOString().split("T")[0],
+        totalClasses: slots.length,
+        classes: slots.map((s: any) => ({
+          subjectCode: s.subjectId?.code || "Unknown",
+          subjectName: s.subjectId?.name || "Unknown",
+          time: `${s.timeSlot.startTime} - ${s.timeSlot.endTime}`,
+          room: s.room || "TBA",
+          type: s.type,
+          faculty: s.subjectId?.faculty || "",
+        })),
+      };
+    }
+
+    case "get_subject_attendance": {
+      const user = await User.findById(userObjectId).select("targetAttendancePercentage");
+      const defaultTarget = user?.targetAttendancePercentage || 75;
+
+      const subjects = await Subject.find({ userId: userObjectId });
+      const attendanceAgg = await Attendance.aggregate([
+        { $match: { userId: userObjectId } },
+        {
+          $group: {
+            _id: { subjectId: "$subjectId", status: "$status" },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const countMap: Record<string, number> = {};
+      for (const row of attendanceAgg) {
+        if (row._id?.subjectId && row._id?.status) {
+          countMap[`${row._id.subjectId.toString()}_${row._id.status}`] = row.count;
+        }
+      }
+
+      const metricsList = subjects.map((sub) => {
+        const subId = sub._id.toString();
+        const attended = countMap[`${subId}_Attended`] || 0;
+        const absent = countMap[`${subId}_Absent`] || 0;
+        const cancelled = countMap[`${subId}_Cancelled`] || 0;
+        const pending = countMap[`${subId}_Pending`] || 0;
+
+        return calculateSubjectMetrics({
+          subjectId: subId,
+          subjectCode: sub.code,
+          subjectName: sub.name,
+          attended,
+          absent,
+          cancelled,
+          pending,
+          targetPercentage: sub.minAttendanceThreshold || defaultTarget,
+        });
+      });
+
+      if (args?.subjectNameOrCode) {
+        const query = args.subjectNameOrCode.toLowerCase().trim();
+        const matched = metricsList.find(
+          (m) =>
+            m.subjectCode.toLowerCase().includes(query) ||
+            m.subjectName.toLowerCase().includes(query)
+        );
+
+        if (!matched) {
+          return {
+            error: `No subject matching '${args.subjectNameOrCode}' was found in your registered subjects.`,
+            availableSubjects: metricsList.map((m) => `${m.subjectCode} - ${m.subjectName}`),
+          };
+        }
+
+        return matched;
+      }
+
+      const overall = calculateOverallMetrics(metricsList, defaultTarget);
+      return { overall, subjects: metricsList };
+    }
+
+    case "calculate_bunk_and_targets": {
+      const user = await User.findById(userObjectId).select("targetAttendancePercentage");
+      const target = args.targetPercentage ? Number(args.targetPercentage) : user?.targetAttendancePercentage || 75;
+
+      // Fetch attendance metrics
+      const subjects = await Subject.find({ userId: userObjectId });
+      const attendanceAgg = await Attendance.aggregate([
+        { $match: { userId: userObjectId } },
+        {
+          $group: {
+            _id: { subjectId: "$subjectId", status: "$status" },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const countMap: Record<string, number> = {};
+      for (const row of attendanceAgg) {
+        if (row._id?.subjectId && row._id?.status) {
+          countMap[`${row._id.subjectId.toString()}_${row._id.status}`] = row.count;
+        }
+      }
+
+      if (args.subjectNameOrCode) {
+        const query = args.subjectNameOrCode.toLowerCase().trim();
+        const sub = subjects.find(
+          (s) => s.code.toLowerCase().includes(query) || s.name.toLowerCase().includes(query)
+        );
+
+        if (!sub) {
+          return { error: `Subject '${args.subjectNameOrCode}' not found.` };
+        }
+
+        const subId = sub._id.toString();
+        const attended = countMap[`${subId}_Attended`] || 0;
+        const absent = countMap[`${subId}_Absent`] || 0;
+        const conducted = attended + absent;
+        const currentPercentage = conducted === 0 ? 100 : Number(((attended / conducted) * 100).toFixed(2));
+        const needed = calculateClassesNeeded(attended, conducted, target);
+        const canMiss = calculateMaxClassesCanMiss(attended, conducted, target);
+
+        return {
+          subjectCode: sub.code,
+          subjectName: sub.name,
+          targetPercentage: target,
+          currentPercentage,
+          conducted,
+          attended,
+          absent,
+          classesNeededToReachTarget: needed,
+          maxClassesCanMiss: canMiss,
+          verdict:
+            currentPercentage >= target
+              ? `You can safely miss ${canMiss} class(es) while keeping your attendance above ${target}%.`
+              : `You must attend the next ${needed} consecutive class(es) to reach ${target}%.`,
+        };
+      }
+
+      // Overall
+      let totalAttended = 0;
+      let totalAbsent = 0;
+      for (const sub of subjects) {
+        const subId = sub._id.toString();
+        totalAttended += countMap[`${subId}_Attended`] || 0;
+        totalAbsent += countMap[`${subId}_Absent`] || 0;
+      }
+      const totalConducted = totalAttended + totalAbsent;
+      const overallPercentage = totalConducted === 0 ? 100 : Number(((totalAttended / totalConducted) * 100).toFixed(2));
+      const needed = calculateClassesNeeded(totalAttended, totalConducted, target);
+      const canMiss = calculateMaxClassesCanMiss(totalAttended, totalConducted, target);
+
+      return {
+        scope: "Overall",
+        targetPercentage: target,
+        currentPercentage: overallPercentage,
+        totalConducted,
+        totalAttended,
+        totalAbsent,
+        classesNeededToReachTarget: needed,
+        maxClassesCanMiss: canMiss,
+        verdict:
+          overallPercentage >= target
+            ? `Overall, you have a buffer to miss ${canMiss} classes while staying at or above ${target}%.`
+            : `Overall, you must attend ${needed} consecutive classes to raise your cumulative attendance to ${target}%.`,
+      };
+    }
+
+    case "get_lowest_attendance_subject": {
+      const subjects = await Subject.find({ userId: userObjectId });
+      if (subjects.length === 0) {
+        return { message: "No subjects registered yet." };
+      }
+
+      const attendanceAgg = await Attendance.aggregate([
+        { $match: { userId: userObjectId } },
+        {
+          $group: {
+            _id: { subjectId: "$subjectId", status: "$status" },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const countMap: Record<string, number> = {};
+      for (const row of attendanceAgg) {
+        if (row._id?.subjectId && row._id?.status) {
+          countMap[`${row._id.subjectId.toString()}_${row._id.status}`] = row.count;
+        }
+      }
+
+      const list = subjects.map((sub) => {
+        const subId = sub._id.toString();
+        const attended = countMap[`${subId}_Attended`] || 0;
+        const absent = countMap[`${subId}_Absent`] || 0;
+        const conducted = attended + absent;
+        const pct = conducted === 0 ? 100 : (attended / conducted) * 100;
+        return {
+          code: sub.code,
+          name: sub.name,
+          attended,
+          conducted,
+          percentage: Number(pct.toFixed(2)),
+        };
+      });
+
+      // Filter to subjects that had at least 1 conducted class
+      const conductedList = list.filter((l) => l.conducted > 0);
+      if (conductedList.length === 0) {
+        return { message: "No conducted classes recorded yet across subjects." };
+      }
+
+      conductedList.sort((a, b) => a.percentage - b.percentage);
+      const lowest = conductedList[0];
+
+      return {
+        lowestAttendanceSubject: lowest,
+        warning: lowest.percentage < 75 ? "CRITICAL: Attendance below 75% threshold!" : "Attendance is within safe range.",
+      };
+    }
+
+    case "get_upcoming_academic_events": {
+      const daysAhead = args.daysAhead || 30;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const futureDate = new Date(today);
+      futureDate.setDate(futureDate.getDate() + daysAhead);
+
+      const query: any = {
+        userId: userObjectId,
+        date: { $gte: today, $lte: futureDate },
+      };
+
+      if (args.eventType && args.eventType !== "All") {
+        query.type = args.eventType;
+      }
+
+      const events = await AcademicEvent.find(query)
+        .populate("subjectId", "code name")
+        .sort({ date: 1 });
+
+      return {
+        count: events.length,
+        events: events.map((e: any) => ({
+          title: e.title,
+          type: e.type,
+          date: e.date.toISOString().split("T")[0],
+          endDate: e.endDate ? e.endDate.toISOString().split("T")[0] : undefined,
+          subject: e.subjectId?.code || undefined,
+          isHoliday: e.isHoliday,
+          description: e.description,
+        })),
+      };
+    }
+
+    case "get_weekly_timetable": {
+      const slots = await Timetable.find({
+        userId: userObjectId,
+        isActive: true,
+      })
+        .populate("subjectId", "code name room color faculty")
+        .sort({ dayOfWeek: 1, "timeSlot.startTime": 1 });
+
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const scheduleByDay: Record<string, any[]> = {};
+
+      for (let i = 1; i <= 6; i++) {
+        scheduleByDay[dayNames[i]] = [];
+      }
+
+      for (const slot of slots as any[]) {
+        const dName = dayNames[slot.dayOfWeek];
+        if (!scheduleByDay[dName]) scheduleByDay[dName] = [];
+        scheduleByDay[dName].push({
+          subjectCode: slot.subjectId?.code || "Unknown",
+          subjectName: slot.subjectId?.name || "Unknown",
+          time: `${slot.timeSlot.startTime} - ${slot.timeSlot.endTime}`,
+          room: slot.room || "TBA",
+          type: slot.type,
+        });
+      }
+
+      return { schedule: scheduleByDay };
+    }
+
+    default:
+      return { error: `Tool ${toolName} not recognized.` };
+  }
+}
