@@ -7,6 +7,8 @@ import { Timetable } from "@/lib/db/models/Timetable";
 import { AcademicEvent } from "@/lib/db/models/AcademicEvent";
 import { createAuditLog } from "@/lib/db/audit";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     const { user, errorResponse } = await authenticateRequest(req);

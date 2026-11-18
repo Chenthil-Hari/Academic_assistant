@@ -6,9 +6,12 @@ import { extractTextFromPdf } from "@/lib/pdf/extract-pdf";
 import { parseAcademicDocument } from "@/lib/pdf/academic-parser";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 
-// Private storage directory
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+export const dynamic = "force-dynamic";
+
+// Writable directory on both local and Vercel serverless functions
+const UPLOADS_DIR = path.join(os.tmpdir(), "academic_ai_uploads");
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,13 +39,17 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Ensure private user upload directory exists
+    // Write file to /tmp directory safely
     const userUploadDir = path.join(UPLOADS_DIR, user.userId);
-    await fs.mkdir(userUploadDir, { recursive: true });
-
-    const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const filePath = path.join(userUploadDir, safeFileName);
-    await fs.writeFile(filePath, buffer);
+    let filePath = `memory://${file.name}`;
+    try {
+      await fs.mkdir(userUploadDir, { recursive: true });
+      const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      filePath = path.join(userUploadDir, safeFileName);
+      await fs.writeFile(filePath, buffer);
+    } catch (fsErr) {
+      console.warn("Serverless disk write skipped, using memory buffer:", fsErr);
+    }
 
     await connectToDatabase();
 
