@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [checkinData, setCheckinData] = useState<any>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [checkinMessage, setCheckinMessage] = useState("");
@@ -36,21 +37,24 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [statsRes, checkinRes, eventsRes] = await Promise.all([
+      const [statsRes, checkinRes, eventsRes, userRes] = await Promise.all([
         fetch("/api/attendance/stats"),
         fetch("/api/attendance/checkin"),
         fetch("/api/calendar?upcoming=true"),
+        fetch("/api/auth/me"),
       ]);
 
-      const [statsJson, checkinJson, eventsJson] = await Promise.all([
+      const [statsJson, checkinJson, eventsJson, userJson] = await Promise.all([
         statsRes.json(),
         checkinRes.json(),
         eventsRes.json(),
+        userRes.json(),
       ]);
 
       if (statsJson.success) setStats(statsJson);
       if (checkinJson.success) setCheckinData(checkinJson);
       if (eventsJson.success) setUpcomingEvents((eventsJson.events || []).slice(0, 4));
+      if (userJson.success) setUser(userJson.user);
     } catch (err) {
       console.error("Dashboard data load error:", err);
     } finally {
@@ -109,11 +113,15 @@ export default function DashboardPage() {
         {/* Top welcome banner */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold text-primary mb-2 border border-primary/20">
+              <Sparkles className="h-3 w-3" />
+              <span>Personal Student OS</span>
+            </div>
             <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-              Academic Dashboard
+              Welcome back, {user?.name || "Hari"} 👋
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Real-time attendance tracking, today's schedule & deterministic calculations
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              Your personal timetable, real-time attendance calculations & daily 4:00 PM check-ins
             </p>
           </div>
 

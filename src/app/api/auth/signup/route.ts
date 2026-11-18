@@ -24,6 +24,21 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
+    // Personal Instance: Check single-user mode lock
+    const isSingleUserLocked = process.env.SINGLE_USER_MODE === "true" || process.env.DISABLE_PUBLIC_SIGNUP === "true";
+    if (isSingleUserLocked) {
+      const userCount = await User.countDocuments();
+      if (userCount >= 1) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Personal Instance: Public registration is locked to the owner account only.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
       return NextResponse.json(

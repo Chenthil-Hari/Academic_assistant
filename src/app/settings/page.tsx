@@ -175,10 +175,14 @@ export default function SettingsPage() {
     <AppLayout>
       <div className="max-w-4xl mx-auto space-y-8">
         <div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold text-primary mb-2 border border-primary/20">
+            <ShieldCheck className="h-3 w-3" />
+            <span>Personal Edition • Single-User Mode Active</span>
+          </div>
           <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-            Account & System Settings
+            Account & Personal Assistant Settings
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             Configure your student profile, attendance thresholds, 4:00 PM IST check-in triggers and notifications.
           </p>
         </div>

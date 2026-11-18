@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { Conversation, IConversation } from "@/lib/db/models/Conversation";
+import { User } from "@/lib/db/models/User";
 import { AI_TOOLS_DEFINITIONS, executeAiTool } from "./tools";
 import mongoose from "mongoose";
 
@@ -16,6 +17,8 @@ export async function processUserMessage(params: {
 }): Promise<ChatResponse> {
   const { userId, message } = params;
   const userObjectId = new mongoose.Types.ObjectId(userId);
+  const userDoc = await User.findById(userObjectId);
+  const studentName = userDoc?.name || "Hari";
 
   // 1. Fetch or create Conversation in MongoDB
   let conversation: IConversation | null = null;
@@ -52,15 +55,17 @@ export async function processUserMessage(params: {
 
       // Build context messages from history (last 10 turns)
       const systemPrompt = `
-You are Academic AI, a highly competent, precise, and supportive Academic Management Assistant.
-You help students monitor their timetable, daily schedule, attendance percentages, target attendances, bunk safety buffers, exams, and calendar events.
+You are the personal AI Academic Management Assistant built exclusively for ${studentName}.
+You serve as their private, dedicated student advisor, study planner, and attendance operating system.
+You know ${studentName}'s enrolled subjects, timetable schedule, bunk thresholds, exams, and calendar events.
 
 CRITICAL RULES:
-1. Always call the appropriate tool to fetch verified, authenticated data from the user's MongoDB records.
-2. NEVER fabricate, estimate, or hallucinate attendance numbers, subject codes, or dates.
-3. When answering questions about attendance, cite exact figures: Conducted, Attended, Absent, and Percentage.
-4. If a user asks "Can I miss a class?" or "How many classes must I attend?", call calculate_bunk_and_targets.
-5. Format your output clearly using markdown, bold headers, bullet points, and percentage indicators.
+1. Always call the appropriate tool to fetch verified, authenticated data from ${studentName}'s MongoDB records.
+2. Address ${studentName} personally and supportively with crisp, authoritative academic clarity.
+3. NEVER fabricate, estimate, or hallucinate attendance numbers, subject codes, or dates.
+4. When answering questions about attendance, cite exact figures: Conducted, Attended, Absent, and Percentage.
+5. If ${studentName} asks "Can I miss a class?" or "How many classes must I attend?", call calculate_bunk_and_targets.
+6. Format your output clearly using markdown, bold headers, bullet points, and percentage indicators.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -123,11 +128,11 @@ CRITICAL RULES:
       }
     } catch (openaiErr) {
       console.warn("OpenAI API call failed, using deterministic grounded fallback:", openaiErr);
-      assistantReply = await runGroundedFallback(message, userId, toolCallsMade);
+      assistantReply = await runGroundedFallback(message, userId, toolCallsMade, studentName);
     }
   } else {
     // Deterministic grounded response handler
-    assistantReply = await runGroundedFallback(message, userId, toolCallsMade);
+    assistantReply = await runGroundedFallback(message, userId, toolCallsMade, studentName);
   }
 
   // Append assistant message to persistent conversation
@@ -153,7 +158,8 @@ CRITICAL RULES:
 async function runGroundedFallback(
   message: string,
   userId: string,
-  toolCalls: string[]
+  toolCalls: string[],
+  studentName: string = "Hari"
 ): Promise<string> {
   const lower = message.toLowerCase();
 
@@ -244,5 +250,5 @@ async function runGroundedFallback(
     return `📊 **Your Academic Attendance Summary**\n\n• **Overall Attendance:** **${data.overall.overallPercentage}%**\n• Target Threshold: **${data.overall.targetPercentage}%**\n• Status: **${data.overall.status}**\n\n**Subject Breakdown:**\n${list}\n\n*Ask me "Can I miss a class in DBMS?" or "What classes do I have today?" for specific details!*`;
   }
 
-  return "👋 I am your Academic AI Assistant. Ask me about your timetable today, subject attendance, bunk calculator, or upcoming exams!";
+  return `👋 Hi ${studentName}! I am your personal Academic AI Assistant. Ask me about your timetable today, subject attendance, bunk calculator, or upcoming exams!`;
 }
