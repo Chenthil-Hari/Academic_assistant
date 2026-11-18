@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/layout/ThemeProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://hari07.tech"),
   title: "Academic AI – Personal Academic Management Assistant",
   description: "Production-ready, standalone AI-powered academic management assistant for college students.",
   manifest: "/manifest.json",
