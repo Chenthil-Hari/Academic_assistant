@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testCronRunning, setTestCronRunning] = useState(false);
+  const [testingTelegram, setTestingTelegram] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [pushStatus, setPushStatus] = useState<string>("Checking...");
 
@@ -168,6 +169,35 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to trigger daily check-in." });
     } finally {
       setTestCronRunning(false);
+    }
+  };
+
+  const handleSendTestTelegram = async () => {
+    if (!profile.telegramChatId.trim()) {
+      setMessage({ type: "error", text: "Please enter your Telegram Chat ID first." });
+      return;
+    }
+
+    setTestingTelegram(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/notifications/test-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: profile.telegramChatId.trim() }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setMessage({ type: "success", text: data.message });
+      } else {
+        setMessage({ type: "error", text: data.message || "Failed to deliver Telegram test message." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: "Failed to connect to Telegram test endpoint." });
+    } finally {
+      setTestingTelegram(false);
     }
   };
 
@@ -377,7 +407,19 @@ export default function SettingsPage() {
                 </p>
 
                 <div className="space-y-1.5">
-                  <label className="font-semibold text-foreground">Telegram Chat ID</label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-foreground">Telegram Chat ID</label>
+                    {profile.telegramChatId && (
+                      <button
+                        type="button"
+                        disabled={testingTelegram}
+                        onClick={handleSendTestTelegram}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 hover:underline disabled:opacity-50"
+                      >
+                        {testingTelegram ? "Sending..." : "Send Test Alert 🚀"}
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={profile.telegramChatId}
@@ -386,7 +428,7 @@ export default function SettingsPage() {
                     className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    Message your bot or @userinfobot on Telegram to get your numeric Chat ID.
+                    Message your bot or <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-primary underline">@userinfobot</a> on Telegram to get your numeric Chat ID.
                   </p>
                 </div>
               </div>
