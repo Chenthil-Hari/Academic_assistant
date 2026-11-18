@@ -175,9 +175,26 @@ ${rawText ? rawText.slice(0, 8000) : "Refer to the attached document image."}
                 ...sub,
                 color: sub.color || PALETTE[idx % PALETTE.length],
               }));
+              const normalizedSlots = (parsed.timetableSlots || []).map((slot) => {
+                const fix24 = (t: string) => {
+                  if (!t) return t;
+                  const parts = t.trim().split(":");
+                  if (parts.length < 2) return t;
+                  let h = parseInt(parts[0], 10);
+                  const m = parts[1].replace(/[^0-9]/g, "").padStart(2, "0");
+                  if (h >= 1 && h <= 6) h += 12;
+                  return `${String(h).padStart(2, "0")}:${m}`;
+                };
+                return {
+                  ...slot,
+                  startTime: fix24(slot.startTime),
+                  endTime: fix24(slot.endTime),
+                };
+              });
+
               return {
                 subjects: parsed.subjects || [],
-                timetableSlots: parsed.timetableSlots || [],
+                timetableSlots: normalizedSlots,
                 calendarEvents: [],
                 semesterDates: parsed.semesterDates,
               };

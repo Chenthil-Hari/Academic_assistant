@@ -32,8 +32,9 @@ export default function TimetablePage() {
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("weekly");
   const [loading, setLoading] = useState(true);
 
-  // Modal
+  // Modals
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newSlot, setNewSlot] = useState({
     subjectId: "",
     dayOfWeek: 1,
@@ -42,6 +43,55 @@ export default function TimetablePage() {
     room: "",
     type: "Lecture",
   });
+  const [editingSlot, setEditingSlot] = useState({
+    id: "",
+    subjectId: "",
+    dayOfWeek: 1,
+    startTime: "09:00",
+    endTime: "10:00",
+    room: "",
+    type: "Lecture",
+  });
+
+  const openEditModal = (slot: any) => {
+    setEditingSlot({
+      id: slot._id,
+      subjectId: slot.subjectId?._id || slot.subjectId || "",
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.timeSlot?.startTime || "09:00",
+      endTime: slot.timeSlot?.endTime || "10:00",
+      room: slot.room || "",
+      type: slot.type || "Lecture",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateSlot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/timetable/${editingSlot.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subjectId: editingSlot.subjectId,
+          dayOfWeek: editingSlot.dayOfWeek,
+          startTime: editingSlot.startTime,
+          endTime: editingSlot.endTime,
+          room: editingSlot.room,
+          type: editingSlot.type,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowEditModal(false);
+        loadTimetable();
+      } else {
+        alert(data.message || "Failed to update slot.");
+      }
+    } catch (err) {
+      alert("Error updating slot.");
+    }
+  };
 
   useEffect(() => {
     loadTimetable();
@@ -166,7 +216,9 @@ export default function TimetablePage() {
         {viewMode === "weekly" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {DAYS.map((day) => {
-              const daySlots = slots.filter((s) => s.dayOfWeek === day.index);
+              const daySlots = slots
+                .filter((s) => s.dayOfWeek === day.index)
+                .sort((a, b) => (a.timeSlot?.startTime || "").localeCompare(b.timeSlot?.startTime || ""));
               const isToday = new Date().getDay() === day.index;
 
               return (
@@ -196,19 +248,35 @@ export default function TimetablePage() {
                       daySlots.map((slot) => (
                         <div
                           key={slot._id}
-                          className="group relative rounded-2xl border bg-muted/40 p-3 hover:border-primary/50 transition-all"
+                          onClick={() => openEditModal(slot)}
+                          className="group relative rounded-2xl border bg-muted/40 p-3 hover:border-primary/50 transition-all cursor-pointer"
                         >
                           <div className="flex items-start justify-between">
                             <span className="font-extrabold text-xs text-foreground">
                               {slot.subjectId?.code || "Subject"}
                             </span>
-                            <button
-                              onClick={() => handleDeleteSlot(slot._id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-opacity"
-                              title="Delete slot"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(slot);
+                                }}
+                                className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                                title="Edit slot timing"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSlot(slot._id);
+                                }}
+                                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                title="Delete slot"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
 
                           <div className="text-[11px] text-muted-foreground truncate mt-0.5">
@@ -261,18 +329,42 @@ export default function TimetablePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {slots
                     .filter((s) => s.dayOfWeek === activeDay)
+                    .sort((a, b) => (a.timeSlot?.startTime || "").localeCompare(b.timeSlot?.startTime || ""))
                     .map((slot) => (
                       <div
                         key={slot._id}
-                        className="rounded-2xl border bg-muted/30 p-4 space-y-2 hover:border-primary/40 transition-colors"
+                        onClick={() => openEditModal(slot)}
+                        className="rounded-2xl border bg-muted/30 p-4 space-y-2 hover:border-primary/40 transition-colors cursor-pointer group"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-extrabold text-sm text-foreground">
                             {slot.subjectId?.code}
                           </span>
-                          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                            {slot.type}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                              {slot.type}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(slot);
+                              }}
+                              className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                              title="Edit timing"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSlot(slot._id);
+                              }}
+                              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              title="Delete slot"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {slot.subjectId?.name}
@@ -412,6 +504,141 @@ export default function TimetablePage() {
                   >
                     Add Slot
                   </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Slot Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b">
+                <div>
+                  <h3 className="font-bold text-base text-foreground">Edit Class Timing & Slot</h3>
+                  <p className="text-xs text-muted-foreground">Adjust start/end hours, subject, or room.</p>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateSlot} className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground">Subject *</label>
+                  <select
+                    required
+                    value={editingSlot.subjectId}
+                    onChange={(e) => setEditingSlot({ ...editingSlot, subjectId: e.target.value })}
+                    className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                  >
+                    <option value="">-- Select Subject --</option>
+                    {subjects.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.code} - {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground">Day of Week *</label>
+                  <select
+                    value={editingSlot.dayOfWeek}
+                    onChange={(e) => setEditingSlot({ ...editingSlot, dayOfWeek: Number(e.target.value) })}
+                    className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d.index} value={d.index}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground">Start Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={editingSlot.startTime}
+                      onChange={(e) => setEditingSlot({ ...editingSlot, startTime: e.target.value })}
+                      className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground">End Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={editingSlot.endTime}
+                      onChange={(e) => setEditingSlot({ ...editingSlot, endTime: e.target.value })}
+                      className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground">Room / Venue</label>
+                    <input
+                      type="text"
+                      value={editingSlot.room}
+                      onChange={(e) => setEditingSlot({ ...editingSlot, room: e.target.value })}
+                      placeholder="e.g. AB-308"
+                      className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground">Class Type</label>
+                    <select
+                      value={editingSlot.type}
+                      onChange={(e) => setEditingSlot({ ...editingSlot, type: e.target.value })}
+                      className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                    >
+                      <option value="Lecture">Lecture</option>
+                      <option value="Lab">Lab</option>
+                      <option value="Tutorial">Tutorial</option>
+                      <option value="Seminar">Seminar</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      handleDeleteSlot(editingSlot.id);
+                    }}
+                    className="rounded-xl px-3 py-2 text-destructive hover:bg-destructive/10 font-semibold flex items-center gap-1.5"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete Slot</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditModal(false)}
+                      className="rounded-xl border px-4 py-2 text-foreground hover:bg-muted font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-primary px-4 py-2 text-primary-foreground font-semibold hover:bg-primary/90 shadow-sm"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
