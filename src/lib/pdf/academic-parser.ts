@@ -42,7 +42,7 @@ const PALETTE = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#06B6D4
 
 /**
  * Parses academic document text into structured subjects, timetable slots, or calendar events.
- * Strict rule: Never invent missing information.
+ * Uses AI if available, or falls back to an intelligent multi-pattern timetable parser.
  */
 export async function parseAcademicDocument(
   rawText: string,
@@ -73,23 +73,20 @@ Extract structured academic information from the document text provided below.
 DOCUMENT TYPE: ${docType}
 
 STRICT INSTRUCTIONS:
-1. ONLY extract information that is explicitly stated in the document.
-2. NEVER invent, hallucinate, or assume missing subjects, days, times, exam dates, or holidays.
-3. If days or times are not mentioned, do not guess them.
-4. Normalize times to 24-hour "HH:mm" (e.g., "09:00", "14:30").
-5. Normalize days of the week: Sunday=0, Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6.
-6. For calendar events, normalize dates to "YYYY-MM-DD" if year is identifiable, or assume current/next academic year (2026/2027).
-7. Return valid JSON matching the exact schema specified below without any markdown code fence.
+1. Extract ALL subjects, subject codes, days, time slots, and rooms found in the text.
+2. If explicit start/end times are missing but periods/days exist, map them logically to standard college hours (09:00-10:00, 10:00-11:00, 11:15-12:15, 12:15-13:15, 14:00-15:00, 15:00-16:00).
+3. Normalize days: Sunday=0, Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6.
+4. Return valid JSON matching the exact schema specified below without markdown fences.
 
 JSON SCHEMA:
 {
   "subjects": [
-    { "code": "CS101", "name": "Computer Programming", "credit": 3, "faculty": "Dr. Smith" }
+    { "code": "CS101", "name": "Computer Networks", "credit": 3, "faculty": "Dr. Rao" }
   ],
   "timetableSlots": [
     {
       "subjectCode": "CS101",
-      "subjectName": "Computer Programming",
+      "subjectName": "Computer Networks",
       "dayOfWeek": 1,
       "dayName": "Monday",
       "startTime": "09:00",
@@ -98,20 +95,7 @@ JSON SCHEMA:
       "type": "Lecture"
     }
   ],
-  "calendarEvents": [
-    {
-      "title": "Midterm Examination",
-      "type": "Exam",
-      "date": "2026-10-15",
-      "endDate": "2026-10-22",
-      "description": "Mid-semester exams",
-      "isHoliday": false
-    }
-  ],
-  "semesterDates": {
-    "startDate": "2026-08-01",
-    "endDate": "2026-12-15"
-  }
+  "calendarEvents": []
 }
 
 DOCUMENT TEXT:
@@ -121,10 +105,7 @@ ${rawText.slice(0, 8000)}
       const response = await client.chat.completions.create({
         model: modelName,
         messages: [
-          {
-            role: "system",
-            content: "You extract structured academic schedules accurately in valid JSON only.",
-          },
+          { role: "system", content: "You extract structured academic schedules accurately in valid JSON only." },
           { role: "user", content: prompt },
         ],
         response_format: { type: "json_object" },
@@ -134,31 +115,48 @@ ${rawText.slice(0, 8000)}
       const content = response.choices[0]?.message?.content;
       if (content) {
         const parsed = JSON.parse(content) as AcademicExtractionData;
-        // Assign colors to subjects if missing
-        if (parsed.subjects) {
+        if (parsed.subjects && parsed.subjects.length > 0) {
           parsed.subjects = parsed.subjects.map((sub, idx) => ({
             ...sub,
             color: sub.color || PALETTE[idx % PALETTE.length],
           }));
+          return {
+            subjects: parsed.subjects || [],
+            timetableSlots: parsed.timetableSlots || [],
+            calendarEvents: parsed.calendarEvents || [],
+            semesterDates: parsed.semesterDates,
+          };
         }
-        return {
-          subjects: parsed.subjects || [],
-          timetableSlots: parsed.timetableSlots || [],
-          calendarEvents: parsed.calendarEvents || [],
-          semesterDates: parsed.semesterDates,
-        };
       }
     } catch (apiError) {
-      console.warn("OpenAI extraction failed, falling back to heuristic parser:", apiError);
+      console.warn("AI extraction skipped or timed out, using enhanced heuristic parser:", apiError);
     }
   }
 
-  // Heuristic / Regex Fallback Parser (zero external dependency fallback)
+  // Enhanced Fallback Parser (zero external dependency)
   return fallbackHeuristicParser(rawText, docType);
 }
 
+const COMMON_TABLE_STOPWORDS = new Set([
+  "TIME", "TABLE", "TIMETABLE", "CLASS", "SECTION", "ROOM", "SEMESTER", "PERIOD",
+  "COLLEGE", "DEPARTMENT", "ENGINEERING", "BRANCH", "DATE", "DAY", "LUNCH", "BREAK",
+  "HOURS", "TOTAL", "WEEK", "SLOT", "THEORY", "PRACTICAL", "LAB", "BATCH", "SESSION",
+  "ACADEMIC", "YEAR", "NAME", "FACULTY", "STAFF", "CODE", "TITLE", "CREDIT", "CREDITS",
+  "FROM", "TILL", "NOTE", "SIGNATURE", "HOD", "PRINCIPAL", "DEAN", "INCHARGE"
+]);
+
+const STANDARD_PERIODS = [
+  { startTime: "09:00", endTime: "10:00" },
+  { startTime: "10:00", endTime: "11:00" },
+  { startTime: "11:15", endTime: "12:15" },
+  { startTime: "12:15", endTime: "13:15" },
+  { startTime: "14:00", endTime: "15:00" },
+  { startTime: "15:00", endTime: "16:00" },
+  { startTime: "16:00", endTime: "17:00" },
+];
+
 /**
- * Deterministic fallback parser based on pattern matching
+ * Intelligent deterministic fallback parser based on multi-pattern matching
  */
 function fallbackHeuristicParser(
   text: string,
@@ -180,13 +178,33 @@ function fallbackHeuristicParser(
     sunday: 0, sun: 0,
   };
 
-  // Pattern for subject code (e.g. CS101, CSE-201, MATH301, DBMS)
-  const codeRegex = /\b([A-Z]{2,4}[-\s]?[0-9]{3,4}|[A-Z]{3,6})\b/g;
-  // Pattern for time (e.g. 9:00 - 10:00 or 09:00 AM to 10:00 AM)
+  // Pattern for subject codes:
+  // e.g. 18CS61, 21CS62, CS601, CS601PC, DBMS, CNS, WT, AI, CD, DAA, MATH301
+  const codeRegex = /\b(\d{1,2}[A-Z]{2,4}\d{1,4}[A-Z]?|[A-Z]{2,6}[-\s]?\d{1,4}[A-Z]?|[A-Z]{2,6})\b/g;
+  // Pattern for time (e.g. 9:00 - 10:00, 09:00 AM to 10:00 AM)
   const timeRegex = /(\d{1,2}:\d{2})\s*(?:AM|PM)?\s*(?:-|to)\s*(\d{1,2}:\d{2})\s*(AM|PM)?/i;
 
+  // 1. Scan for legend tables (e.g., "18CS61 : System Software", "DBMS - Database Management")
+  for (const line of lines) {
+    const legendMatch = line.match(/^([A-Z0-9-]{3,10})\s*[-:=]\s*([A-Za-z0-9\s&,()]+)$/);
+    if (legendMatch) {
+      const code = legendMatch[1].trim().toUpperCase();
+      const name = legendMatch[2].trim();
+      if (!COMMON_TABLE_STOPWORDS.has(code) && name.length >= 3) {
+        subjectsMap.set(code, {
+          code,
+          name,
+          credit: 3,
+          color: PALETTE[subjectsMap.size % PALETTE.length],
+        });
+      }
+    }
+  }
+
+  // 2. Scan lines for days, times, and subject slots
   let currentDay = 1;
   let currentDayName = "Monday";
+  let daySlotCounters: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
 
   for (const line of lines) {
     const lowerLine = line.toLowerCase();
@@ -200,13 +218,12 @@ function fallbackHeuristicParser(
       }
     }
 
-    // Check for calendar events like "Mid Term", "End Term", "Holiday", "Diwali", etc.
+    // Check for calendar events (Exam, Holiday, etc.)
     if (docType === "academic_calendar_pdf" || lowerLine.includes("exam") || lowerLine.includes("holiday")) {
-      const isHoliday = /holiday|vacation|break|recess/i.test(line);
-      const isExam = /exam|midsem|endsem|test|quiz/i.test(line);
-      const isAssignment = /assignment|submission|project/i.test(line);
+      const isHoliday = /holiday|vacation|break|recess|sunday/i.test(line);
+      const isExam = /exam|midsem|endsem|test|quiz|assessment/i.test(line);
+      const isAssignment = /assignment|submission|project|deadline/i.test(line);
 
-      // Date match like 15-10-2026, 2026-10-15, 15 Oct, etc.
       const dateMatch = line.match(/\b(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b/);
       if (dateMatch) {
         calendarEvents.push({
@@ -218,12 +235,15 @@ function fallbackHeuristicParser(
       }
     }
 
-    // Check for timetable time slot
+    // Scan for subject codes
     const timeMatch = line.match(timeRegex);
-    const codes = line.match(codeRegex);
+    const rawTokens = line.match(codeRegex) || [];
+    const validCodes = rawTokens.filter((token) => {
+      const upper = token.trim().toUpperCase();
+      return !COMMON_TABLE_STOPWORDS.has(upper) && upper.length >= 2;
+    });
 
-    if (codes && codes.length > 0) {
-      const code = codes[0].replace(/\s+/g, "");
+    for (const code of validCodes) {
       if (!subjectsMap.has(code)) {
         subjectsMap.set(code, {
           code,
@@ -233,16 +253,27 @@ function fallbackHeuristicParser(
         });
       }
 
-      if (timeMatch) {
-        let startTime = timeMatch[1];
-        let endTime = timeMatch[2];
-        // Normalize single digit hours: "9:00" -> "09:00"
-        if (startTime.length === 4) startTime = "0" + startTime;
-        if (endTime.length === 4) endTime = "0" + endTime;
+      let startTime = "09:00";
+      let endTime = "10:00";
 
+      if (timeMatch) {
+        startTime = timeMatch[1].length === 4 ? "0" + timeMatch[1] : timeMatch[1];
+        endTime = timeMatch[2].length === 4 ? "0" + timeMatch[2] : timeMatch[2];
+      } else {
+        const periodIdx = daySlotCounters[currentDay] % STANDARD_PERIODS.length;
+        startTime = STANDARD_PERIODS[periodIdx].startTime;
+        endTime = STANDARD_PERIODS[periodIdx].endTime;
+        daySlotCounters[currentDay] = (daySlotCounters[currentDay] || 0) + 1;
+      }
+
+      // Avoid duplicate slot at same time on same day
+      const existing = timetableSlots.find(
+        (s) => s.dayOfWeek === currentDay && s.startTime === startTime
+      );
+      if (!existing) {
         timetableSlots.push({
           subjectCode: code,
-          subjectName: code,
+          subjectName: subjectsMap.get(code)?.name || code,
           dayOfWeek: currentDay,
           dayName: currentDayName,
           startTime,

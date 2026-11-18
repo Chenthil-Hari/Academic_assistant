@@ -78,7 +78,8 @@ CRITICAL RULES:
 3. NEVER fabricate, estimate, or hallucinate attendance numbers, subject codes, or dates.
 4. When answering questions about attendance, cite exact figures: Conducted, Attended, Absent, and Percentage.
 5. If ${studentName} asks "Can I miss a class?" or "How many classes must I attend?", call calculate_bunk_and_targets.
-6. Format your output clearly using markdown, bold headers, bullet points, and percentage indicators.
+6. If ${studentName} asks about their uploaded timetable or calendar PDF, document contents, or what was extracted from their files, call get_uploaded_document_details to inspect the uploaded records and answer accurately.
+7. Format your output clearly using markdown, bold headers, bullet points, and percentage indicators.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [

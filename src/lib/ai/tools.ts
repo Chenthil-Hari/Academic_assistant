@@ -103,6 +103,23 @@ export const AI_TOOLS_DEFINITIONS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_uploaded_document_details",
+      description: "Retrieve details and raw text extracted from the user's uploaded academic PDFs (timetables, academic calendars, syllabus), including filenames, detected subjects, and schedule content.",
+      parameters: {
+        type: "object",
+        properties: {
+          documentType: {
+            type: "string",
+            enum: ["timetable_pdf", "academic_calendar_pdf", "all"],
+            description: "Optional filter for type of uploaded document.",
+          },
+        },
+      },
+    },
+  },
 ];
 
 /**
@@ -431,6 +448,37 @@ export async function executeAiTool(
       }
 
       return { schedule: scheduleByDay };
+    }
+
+    case "get_uploaded_document_details": {
+      const { UploadedDocument } = await import("@/lib/db/models/UploadedDocument");
+      const query: any = { userId: userObjectId };
+      if (args?.documentType && args.documentType !== "all") {
+        query.fileType = args.documentType;
+      }
+      const docs = await UploadedDocument.find(query).sort({ createdAt: -1 }).limit(5);
+
+      if (docs.length === 0) {
+        return {
+          message: "No documents have been uploaded yet. The student can upload timetable or calendar PDFs on the Upload page.",
+          documents: [],
+        };
+      }
+
+      return {
+        count: docs.length,
+        documents: docs.map((d: any) => ({
+          documentId: d._id,
+          fileName: d.fileName,
+          fileType: d.fileType,
+          uploadedAt: d.createdAt,
+          isVerified: d.isVerifiedByUser,
+          detectedSubjects: d.extractedData?.subjects || [],
+          timetableSlotsCount: d.extractedData?.timetableSlots?.length || 0,
+          calendarEventsCount: d.extractedData?.calendarEvents?.length || 0,
+          rawTextSample: d.rawText ? d.rawText.slice(0, 3000) : "No text available.",
+        })),
+      };
     }
 
     default:

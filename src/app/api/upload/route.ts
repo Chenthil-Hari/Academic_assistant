@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       message: `PDF processed successfully (${pages} page${pages > 1 ? "s" : ""}${usedOcr ? ", with OCR" : ""}).`,
       documentId: doc._id,
       extractedData,
+      rawText: text.slice(0, 10000),
       usedOcr,
     });
   } catch (error: any) {

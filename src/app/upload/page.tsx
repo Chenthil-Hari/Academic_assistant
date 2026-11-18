@@ -35,6 +35,8 @@ export default function UploadPage() {
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [step, setStep] = useState<"upload" | "verify" | "done">("upload");
   const [saving, setSaving] = useState(false);
+  const [rawText, setRawText] = useState("");
+  const [showRawText, setShowRawText] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -95,6 +97,7 @@ export default function UploadPage() {
       setSubjects(data.extractedData?.subjects || []);
       setTimetableSlots(data.extractedData?.timetableSlots || []);
       setCalendarEvents(data.extractedData?.calendarEvents || []);
+      setRawText(data.rawText || "");
       setStep("verify");
     } catch (err: any) {
       clearTimeout(timeoutId);
@@ -327,31 +330,46 @@ export default function UploadPage() {
               </button>
             </div>
 
-            {/* Extracted Subjects Section */}
-            {subjects.length > 0 && (
-              <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-base text-foreground">Detected Subjects ({subjects.length})</h3>
-                    <p className="text-xs text-muted-foreground">Verify subject codes and names</p>
-                  </div>
+            {/* Extracted Subjects Section - Always shown for verification */}
+            <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-base text-foreground">Detected Subjects ({subjects.length})</h3>
+                  <p className="text-xs text-muted-foreground">Verify subject codes, names, and credit weighting</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddEmptySubject}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Subject</span>
+                </button>
+              </div>
+
+              {subjects.length === 0 ? (
+                <div className="rounded-2xl border border-dashed p-6 text-center space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    No subjects were automatically detected. Click below to add your subjects directly:
+                  </p>
                   <button
+                    type="button"
                     onClick={handleAddEmptySubject}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    className="inline-flex items-center gap-1.5 rounded-xl border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Subject</span>
+                    <Plus className="h-4 w-4 text-primary" />
+                    <span>Add First Subject</span>
                   </button>
                 </div>
-
+              ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs min-w-[500px]">
                     <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
                       <tr>
-                        <th className="px-3 py-2">Code</th>
+                        <th className="px-3 py-2 w-32">Code</th>
                         <th className="px-3 py-2">Subject Name</th>
-                        <th className="px-3 py-2">Credits</th>
-                        <th className="px-3 py-2 text-right">Action</th>
+                        <th className="px-3 py-2 w-24">Credits</th>
+                        <th className="px-3 py-2 text-right w-16">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -362,7 +380,7 @@ export default function UploadPage() {
                               type="text"
                               value={sub.code}
                               onChange={(e) => handleUpdateSubject(idx, "code", e.target.value.toUpperCase())}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs font-bold text-foreground w-28"
+                              className="rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground w-full"
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -370,21 +388,25 @@ export default function UploadPage() {
                               type="text"
                               value={sub.name}
                               onChange={(e) => handleUpdateSubject(idx, "name", e.target.value)}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground w-full"
+                              className="rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground w-full"
                             />
                           </td>
                           <td className="px-3 py-2">
                             <input
                               type="number"
+                              min={1}
+                              max={8}
                               value={sub.credit || 3}
                               onChange={(e) => handleUpdateSubject(idx, "credit", Number(e.target.value))}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground w-16"
+                              className="rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground w-full"
                             />
                           </td>
                           <td className="px-3 py-2 text-right">
                             <button
+                              type="button"
                               onClick={() => handleRemoveSubject(idx)}
-                              className="p-1 text-muted-foreground hover:text-destructive"
+                              className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted"
+                              title="Remove Subject"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -394,108 +416,127 @@ export default function UploadPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Extracted Timetable Slots */}
-            {timetableSlots.length > 0 && (
+            {docType === "timetable_pdf" && (
               <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-base text-foreground">
                       Detected Timetable Slots ({timetableSlots.length})
                     </h3>
-                    <p className="text-xs text-muted-foreground">Verify days and timings</p>
+                    <p className="text-xs text-muted-foreground">Verify days of week, start times, and rooms</p>
                   </div>
                   <button
+                    type="button"
                     onClick={handleAddEmptySlot}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Add Slot</span>
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
-                      <tr>
-                        <th className="px-3 py-2">Subject Code</th>
-                        <th className="px-3 py-2">Day</th>
-                        <th className="px-3 py-2">Start Time</th>
-                        <th className="px-3 py-2">End Time</th>
-                        <th className="px-3 py-2">Room</th>
-                        <th className="px-3 py-2 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {timetableSlots.map((slot, idx) => (
-                        <tr key={idx}>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={slot.subjectCode}
-                              onChange={(e) => handleUpdateSlot(idx, "subjectCode", e.target.value.toUpperCase())}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs font-bold text-foreground w-28"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <select
-                              value={slot.dayOfWeek}
-                              onChange={(e) => handleUpdateSlot(idx, "dayOfWeek", Number(e.target.value))}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
-                            >
-                              <option value={1}>Monday</option>
-                              <option value={2}>Tuesday</option>
-                              <option value={3}>Wednesday</option>
-                              <option value={4}>Thursday</option>
-                              <option value={5}>Friday</option>
-                              <option value={6}>Saturday</option>
-                            </select>
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="time"
-                              value={slot.startTime}
-                              onChange={(e) => handleUpdateSlot(idx, "startTime", e.target.value)}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="time"
-                              value={slot.endTime}
-                              onChange={(e) => handleUpdateSlot(idx, "endTime", e.target.value)}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={slot.room || ""}
-                              onChange={(e) => handleUpdateSlot(idx, "room", e.target.value)}
-                              placeholder="LH-1"
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground w-20"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              onClick={() => handleRemoveSlot(idx)}
-                              className="p-1 text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
+                {timetableSlots.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed p-6 text-center space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      No timetable hours mapped automatically. Click below to add your class slots:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAddEmptySlot}
+                      className="inline-flex items-center gap-1.5 rounded-xl border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                    >
+                      <Plus className="h-4 w-4 text-primary" />
+                      <span>Add First Slot</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs min-w-[550px]">
+                      <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
+                        <tr>
+                          <th className="px-3 py-2">Subject Code</th>
+                          <th className="px-3 py-2">Day</th>
+                          <th className="px-3 py-2">Start Time</th>
+                          <th className="px-3 py-2">End Time</th>
+                          <th className="px-3 py-2">Room</th>
+                          <th className="px-3 py-2 text-right">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {timetableSlots.map((slot, idx) => (
+                          <tr key={idx}>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={slot.subjectCode}
+                                onChange={(e) => handleUpdateSlot(idx, "subjectCode", e.target.value.toUpperCase())}
+                                className="rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground w-28"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={slot.dayOfWeek}
+                                onChange={(e) => handleUpdateSlot(idx, "dayOfWeek", Number(e.target.value))}
+                                className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground"
+                              >
+                                <option value={1}>Monday</option>
+                                <option value={2}>Tuesday</option>
+                                <option value={3}>Wednesday</option>
+                                <option value={4}>Thursday</option>
+                                <option value={5}>Friday</option>
+                                <option value={6}>Saturday</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="time"
+                                value={slot.startTime}
+                                onChange={(e) => handleUpdateSlot(idx, "startTime", e.target.value)}
+                                className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="time"
+                                value={slot.endTime}
+                                onChange={(e) => handleUpdateSlot(idx, "endTime", e.target.value)}
+                                className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={slot.room || ""}
+                                onChange={(e) => handleUpdateSlot(idx, "room", e.target.value)}
+                                placeholder="LH-1"
+                                className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground w-20"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlot(idx)}
+                                className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted"
+                                title="Remove slot"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Extracted Calendar Events */}
-            {calendarEvents.length > 0 && (
+            {docType === "academic_calendar_pdf" && (
               <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -505,72 +546,116 @@ export default function UploadPage() {
                     <p className="text-xs text-muted-foreground">Exams, assignments, and holidays</p>
                   </div>
                   <button
+                    type="button"
                     onClick={handleAddEmptyEvent}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Add Event</span>
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
-                      <tr>
-                        <th className="px-3 py-2">Title</th>
-                        <th className="px-3 py-2">Type</th>
-                        <th className="px-3 py-2">Date</th>
-                        <th className="px-3 py-2 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {calendarEvents.map((ev, idx) => (
-                        <tr key={idx}>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={ev.title}
-                              onChange={(e) => handleUpdateEvent(idx, "title", e.target.value)}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs font-semibold text-foreground w-full"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <select
-                              value={ev.type}
-                              onChange={(e) => {
-                                const t = e.target.value;
-                                handleUpdateEvent(idx, "type", t);
-                                handleUpdateEvent(idx, "isHoliday", t === "Holiday");
-                              }}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
-                            >
-                              <option value="Exam">Exam</option>
-                              <option value="Assignment">Assignment</option>
-                              <option value="Holiday">Holiday</option>
-                              <option value="Event">Event</option>
-                            </select>
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="date"
-                              value={ev.date?.split("T")[0] || ev.date}
-                              onChange={(e) => handleUpdateEvent(idx, "date", e.target.value)}
-                              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              onClick={() => handleRemoveEvent(idx)}
-                              className="p-1 text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
+                {calendarEvents.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed p-6 text-center space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      No calendar events found. Click below to add an event:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAddEmptyEvent}
+                      className="inline-flex items-center gap-1.5 rounded-xl border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                    >
+                      <Plus className="h-4 w-4 text-primary" />
+                      <span>Add Event</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs min-w-[500px]">
+                      <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
+                        <tr>
+                          <th className="px-3 py-2">Title</th>
+                          <th className="px-3 py-2">Type</th>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2 text-right">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {calendarEvents.map((ev, idx) => (
+                          <tr key={idx}>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={ev.title}
+                                onChange={(e) => handleUpdateEvent(idx, "title", e.target.value)}
+                                className="rounded-lg border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground w-full"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={ev.type}
+                                onChange={(e) => {
+                                  const t = e.target.value;
+                                  handleUpdateEvent(idx, "type", t);
+                                  handleUpdateEvent(idx, "isHoliday", t === "Holiday");
+                                }}
+                                className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground"
+                              >
+                                <option value="Exam">Exam</option>
+                                <option value="Assignment">Assignment</option>
+                                <option value="Holiday">Holiday</option>
+                                <option value="Event">Event</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="date"
+                                value={ev.date?.split("T")[0] || ev.date}
+                                onChange={(e) => handleUpdateEvent(idx, "date", e.target.value)}
+                                className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEvent(idx)}
+                                className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted"
+                                title="Remove event"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Document Text Preview Collapsible */}
+            {rawText && (
+              <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRawText(!showRawText)}
+                  className="flex items-center justify-between w-full text-left"
+                >
+                  <span className="font-bold text-xs text-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <span>View Extracted Document Text ({rawText.length} characters)</span>
+                  </span>
+                  <span className="text-xs text-primary font-semibold hover:underline">
+                    {showRawText ? "Hide Text" : "Show Text"}
+                  </span>
+                </button>
+
+                {showRawText && (
+                  <pre className="mt-2 p-4 rounded-2xl bg-muted/40 text-[11px] text-muted-foreground overflow-x-auto whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
+                    {rawText}
+                  </pre>
+                )}
               </div>
             )}
 
