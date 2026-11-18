@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
     // 1. Extract text (native PDF text + OCR fallback)
     const { text, pages, usedOcr } = await extractTextFromPdf(buffer);
 
-    // 2. Parse academic information
-    const extractedData = await parseAcademicDocument(text, fileType);
+    // 2. Parse academic information (passes buffer for multimodal Gemini vision)
+    const extractedData = await parseAcademicDocument(text, fileType, buffer);
 
     // 3. Save document record in MongoDB
     const doc = await UploadedDocument.create({

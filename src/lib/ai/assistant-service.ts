@@ -177,6 +177,29 @@ async function runGroundedFallback(
 ): Promise<string> {
   const lower = message.toLowerCase();
 
+  if (lower.includes("pdf") || lower.includes("uploaded") || lower.includes("document") || lower.includes("upload")) {
+    toolCalls.push("get_uploaded_document_details");
+    const data = await executeAiTool("get_uploaded_document_details", {}, userId);
+    if (!data.documents || data.documents.length === 0) {
+      return "📄 **Uploaded Documents**: You have not uploaded any timetable or calendar PDFs yet. Go to the **PDF Upload** page to upload your schedule or calendar!";
+    }
+    const docsSummary = data.documents
+      .map((d: any, idx: number) => {
+        const subjectsStr = d.detectedSubjects?.map((s: any) => `\`${s.code}\` (${s.name})`).join(", ") || "None";
+        return `### ${idx + 1}. 📄 **${d.fileName}**
+• **Type**: ${d.fileType === "timetable_pdf" ? "Weekly Timetable" : "Academic Calendar"}
+• **Uploaded**: ${new Date(d.uploadedAt).toLocaleDateString()}
+• **Status**: ${d.isVerified ? "✅ Verified & Active in System" : "⏳ Pending Verification on Upload Page"}
+• **Detected Subjects**: ${subjectsStr}
+• **Timetable Slots**: ${d.timetableSlotsCount} classes mapped
+• **Document Text Preview**:
+> *${d.rawTextSample ? d.rawTextSample.slice(0, 250).replace(/\s+/g, " ") : "No text available"}...*`;
+      })
+      .join("\n\n");
+
+    return `📑 **Your Uploaded Academic Documents (${data.count})**\n\n${docsSummary}\n\n💡 *Ask me any questions about your timetable, classes today, or bunk buffers and I'll link it to your academic records!*`;
+  }
+
   if (lower.includes("today") || lower.includes("class today") || lower.includes("schedule today")) {
     toolCalls.push("get_today_schedule");
     const data = await executeAiTool("get_today_schedule", {}, userId);

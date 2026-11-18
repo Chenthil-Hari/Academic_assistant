@@ -46,66 +46,88 @@ const PALETTE = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#06B6D4
  */
 export async function parseAcademicDocument(
   rawText: string,
-  docType: "timetable_pdf" | "academic_calendar_pdf" | "syllabus_pdf" | "other"
+  docType: "timetable_pdf" | "academic_calendar_pdf" | "syllabus_pdf" | "other",
+  pdfBuffer?: Buffer
 ): Promise<AcademicExtractionData> {
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const isGemini = Boolean(geminiKey && geminiKey !== "your_gemini_api_key_here");
-  const apiKey = isGemini ? geminiKey : openaiKey;
-  const baseURL = isGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined;
-  const modelName = isGemini
-    ? process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
-    : process.env.OPENAI_MODEL || "gpt-4o-mini";
 
-  if (apiKey && apiKey !== "your_openai_api_key_here") {
-    try {
-      const client = new OpenAI({
-        apiKey,
-        baseURL,
-        timeout: 8000,
-        maxRetries: 1,
-      });
-
-      const prompt = `
-You are an expert academic document parser for "Academic AI".
-Extract structured academic information from the document text provided below.
-
-DOCUMENT TYPE: ${docType}
+  const prompt = `
+You are an expert college academic schedule parser.
+Extract structured academic information from this ${docType === "timetable_pdf" ? "Weekly Timetable" : "Academic Calendar"} document.
 
 STRICT INSTRUCTIONS:
-1. Extract ALL subjects, subject codes, days, time slots, and rooms found in the text.
-2. If explicit start/end times are missing but periods/days exist, map them logically to standard college hours (09:00-10:00, 10:00-11:00, 11:15-12:15, 12:15-13:15, 14:00-15:00, 15:00-16:00).
+1. Extract ALL subjects, course codes (e.g. 18CS61, CS601, DBMS, CNS, WT, AI, CD, DAA), lecture timings, lab slots, days of week, and room numbers.
+2. If exact start/end hours are missing or written as periods (1, 2, 3...), map them to standard hours: 09:00-10:00, 10:00-11:00, 11:15-12:15, 12:15-13:15, 14:00-15:00, 15:00-16:00.
 3. Normalize days: Sunday=0, Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6.
-4. Return valid JSON matching the exact schema specified below without markdown fences.
-
-JSON SCHEMA:
+4. Output valid JSON only matching the schema:
 {
-  "subjects": [
-    { "code": "CS101", "name": "Computer Networks", "credit": 3, "faculty": "Dr. Rao" }
-  ],
-  "timetableSlots": [
-    {
-      "subjectCode": "CS101",
-      "subjectName": "Computer Networks",
-      "dayOfWeek": 1,
-      "dayName": "Monday",
-      "startTime": "09:00",
-      "endTime": "10:00",
-      "room": "LH-1",
-      "type": "Lecture"
-    }
-  ],
+  "subjects": [{ "code": "CS601", "name": "Database Management Systems", "credit": 3 }],
+  "timetableSlots": [{ "subjectCode": "CS601", "subjectName": "Database Management Systems", "dayOfWeek": 1, "dayName": "Monday", "startTime": "09:00", "endTime": "10:00", "room": "LH-1", "type": "Lecture" }],
   "calendarEvents": []
 }
 
 DOCUMENT TEXT:
-${rawText.slice(0, 8000)}
+${rawText ? rawText.slice(0, 8000) : "Refer to the attached document image."}
 `;
 
+  // 1. First priority: Native Gemini Multimodal Vision (reads scanned PDF directly)
+  if (isGemini) {
+    try {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(geminiKey!);
+      const model = genAI.getGenerativeModel({
+        model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+
+      const parts: any[] = [];
+      if (pdfBuffer && pdfBuffer.length > 0) {
+        parts.push({
+          inlineData: {
+            data: pdfBuffer.toString("base64"),
+            mimeType: "application/pdf",
+          },
+        });
+      }
+      parts.push(prompt);
+
+      const result = await model.generateContent(parts);
+      const content = result.response.text();
+      if (content) {
+        const parsed = JSON.parse(content) as AcademicExtractionData;
+        if (parsed.subjects && parsed.subjects.length > 0) {
+          parsed.subjects = parsed.subjects.map((sub, idx) => ({
+            ...sub,
+            color: sub.color || PALETTE[idx % PALETTE.length],
+          }));
+          return {
+            subjects: parsed.subjects || [],
+            timetableSlots: parsed.timetableSlots || [],
+            calendarEvents: parsed.calendarEvents || [],
+            semesterDates: parsed.semesterDates,
+          };
+        }
+      }
+    } catch (geminiError) {
+      console.warn("Native Gemini multimodal extraction error:", geminiError);
+    }
+  }
+
+  // 2. Second priority: OpenAI compatible API if configured
+  if (openaiKey && openaiKey !== "your_openai_api_key_here") {
+    try {
+      const client = new OpenAI({
+        apiKey: openaiKey,
+        timeout: 8000,
+        maxRetries: 1,
+      });
+
       const response = await client.chat.completions.create({
-        model: modelName,
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You extract structured academic schedules accurately in valid JSON only." },
+          { role: "system", content: "You extract structured academic schedules in valid JSON only." },
           { role: "user", content: prompt },
         ],
         response_format: { type: "json_object" },
@@ -129,11 +151,11 @@ ${rawText.slice(0, 8000)}
         }
       }
     } catch (apiError) {
-      console.warn("AI extraction skipped or timed out, using enhanced heuristic parser:", apiError);
+      console.warn("OpenAI extraction skipped or timed out:", apiError);
     }
   }
 
-  // Enhanced Fallback Parser (zero external dependency)
+  // 3. Third priority: Enhanced Fallback Parser (zero external dependency)
   return fallbackHeuristicParser(rawText, docType);
 }
 
