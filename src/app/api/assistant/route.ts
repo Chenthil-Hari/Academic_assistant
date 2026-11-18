@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/auth/middleware-utils";
+import connectToDatabase from "@/lib/db/connection";
 import { processUserMessage } from "@/lib/ai/assistant-service";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,8 @@ export async function POST(req: NextRequest) {
   try {
     const { user, errorResponse } = await authenticateRequest(req);
     if (errorResponse || !user) return errorResponse;
+
+    await connectToDatabase();
 
     const body = await req.json();
     const { message, conversationId } = body;

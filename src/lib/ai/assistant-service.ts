@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import connectToDatabase from "@/lib/db/connection";
 import { Conversation, IConversation } from "@/lib/db/models/Conversation";
 import { User } from "@/lib/db/models/User";
 import { AI_TOOLS_DEFINITIONS, executeAiTool } from "./tools";
@@ -15,6 +16,7 @@ export async function processUserMessage(params: {
   conversationId?: string;
   message: string;
 }): Promise<ChatResponse> {
+  await connectToDatabase();
   const { userId, message } = params;
   const userObjectId = new mongoose.Types.ObjectId(userId);
   const userDoc = await User.findById(userObjectId);
