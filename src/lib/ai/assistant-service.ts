@@ -50,7 +50,7 @@ export async function processUserMessage(params: {
   const apiKey = isGemini ? geminiKey : openaiKey;
   const baseURL = isGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined;
   const modelName = isGemini
-    ? process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
+    ? process.env.GEMINI_MODEL || "gemini-flash-lite-latest"
     : process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   let assistantReply = "";

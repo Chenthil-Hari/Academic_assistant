@@ -9,7 +9,7 @@ import path from "path";
 import os from "os";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // Writable directory on both local and Vercel serverless functions
 const UPLOADS_DIR = path.join(os.tmpdir(), "academic_ai_uploads");

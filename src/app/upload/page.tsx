@@ -61,7 +61,7 @@ export default function UploadPage() {
     setError("");
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s safety limit
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s safety limit
 
     try {
       const formData = new FormData();
@@ -102,7 +102,7 @@ export default function UploadPage() {
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === "AbortError") {
-        setError("Extraction took longer than expected (>20s). Please ensure your PDF is clear or try again.");
+        setError("Extraction took longer than expected (>45s). Please ensure your PDF is clear or try again.");
       } else {
         setError(err.message || "Error processing PDF.");
       }

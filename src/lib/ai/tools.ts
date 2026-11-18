@@ -414,17 +414,48 @@ export async function executeAiTool(
         .populate("subjectId", "code name")
         .sort({ date: 1 });
 
+      let formattedEvents = events.map((e: any) => ({
+        title: e.title,
+        type: e.type,
+        date: e.date.toISOString().split("T")[0],
+        endDate: e.endDate ? e.endDate.toISOString().split("T")[0] : undefined,
+        subject: e.subjectId?.code || undefined,
+        isHoliday: e.isHoliday,
+        description: e.description,
+      }));
+
+      // Fallback: If no events found in AcademicEvent collection, search latest uploaded calendar document
+      if (formattedEvents.length === 0) {
+        const { UploadedDocument } = await import("@/lib/db/models/UploadedDocument");
+        const doc = await UploadedDocument.findOne({
+          userId: userObjectId,
+          fileType: "academic_calendar_pdf",
+        }).sort({ createdAt: -1 });
+
+        const extractedCalendar = doc?.extractedData?.calendarEvents || [];
+        if (extractedCalendar.length > 0) {
+          const matchingEvents = args.searchTerm && typeof args.searchTerm === "string" && args.searchTerm.trim()
+            ? extractedCalendar.filter((ev: any) => {
+                const term = args.searchTerm.toLowerCase().trim();
+                return ev.title?.toLowerCase().includes(term) || ev.description?.toLowerCase().includes(term);
+              })
+            : extractedCalendar.slice(0, 30);
+
+          formattedEvents = matchingEvents.map((ev: any) => ({
+            title: ev.title,
+            type: ev.type || "Event",
+            date: ev.date,
+            endDate: ev.endDate,
+            subject: undefined,
+            isHoliday: Boolean(ev.isHoliday),
+            description: ev.description || ev.title,
+          }));
+        }
+      }
+
       return {
-        count: events.length,
-        events: events.map((e: any) => ({
-          title: e.title,
-          type: e.type,
-          date: e.date.toISOString().split("T")[0],
-          endDate: e.endDate ? e.endDate.toISOString().split("T")[0] : undefined,
-          subject: e.subjectId?.code || undefined,
-          isHoliday: e.isHoliday,
-          description: e.description,
-        })),
+        count: formattedEvents.length,
+        events: formattedEvents,
       };
     }
 
@@ -484,6 +515,7 @@ export async function executeAiTool(
           detectedSubjects: d.extractedData?.subjects || [],
           timetableSlotsCount: d.extractedData?.timetableSlots?.length || 0,
           calendarEventsCount: d.extractedData?.calendarEvents?.length || 0,
+          calendarEvents: (d.extractedData?.calendarEvents || []).slice(0, 30),
           rawTextSample: d.rawText ? d.rawText.slice(0, 3000) : "No text available.",
         })),
       };

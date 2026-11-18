@@ -115,57 +115,78 @@ DOCUMENT TEXT:
 ${rawText ? rawText.slice(0, 8000) : "Refer to the attached document image."}
 `;
 
-  // 1. First priority: Native Gemini Multimodal Vision (reads scanned PDF directly)
+  // 1. First priority: Native Gemini Multimodal Vision / Language API
   if (isGemini) {
-    try {
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(geminiKey!);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    const candidateModels = [
+      process.env.GEMINI_MODEL || "gemini-flash-lite-latest",
+      "gemini-3.5-flash-lite",
+      "gemini-flash-latest",
+    ];
 
-      const parts: any[] = [];
-      if (pdfBuffer && pdfBuffer.length > 0) {
-        parts.push({
-          inlineData: {
-            data: pdfBuffer.toString("base64"),
-            mimeType: "application/pdf",
-          },
+    for (const mName of candidateModels) {
+      try {
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(geminiKey!);
+        const model = genAI.getGenerativeModel({
+          model: mName,
+          generationConfig: { responseMimeType: "application/json" },
         });
-      }
-      parts.push(prompt);
 
-      const result = await model.generateContent(parts);
-      const content = result.response.text();
-      if (content) {
-        const parsed = JSON.parse(content) as AcademicExtractionData;
-        if (isCalendar) {
-          if (parsed.calendarEvents && parsed.calendarEvents.length > 0) {
-            return {
-              subjects: [],
-              timetableSlots: [],
-              calendarEvents: parsed.calendarEvents || [],
-              semesterDates: parsed.semesterDates,
-            };
-          }
-        } else {
-          if (parsed.subjects && parsed.subjects.length > 0) {
-            parsed.subjects = parsed.subjects.map((sub, idx) => ({
-              ...sub,
-              color: sub.color || PALETTE[idx % PALETTE.length],
-            }));
-            return {
-              subjects: parsed.subjects || [],
-              timetableSlots: parsed.timetableSlots || [],
-              calendarEvents: [],
-              semesterDates: parsed.semesterDates,
-            };
+        const parts: any[] = [];
+        // Only attach raw PDF buffer for visual scanned timetables
+        if (!isCalendar && pdfBuffer && pdfBuffer.length > 0) {
+          parts.push({
+            inlineData: {
+              data: pdfBuffer.toString("base64"),
+              mimeType: "application/pdf",
+            },
+          });
+        }
+        parts.push(prompt);
+
+        let content = "";
+        try {
+          const result = await model.generateContent(parts);
+          content = result.response.text();
+        } catch (callWithBufferErr) {
+          // If multimodal binary buffer fails (e.g. 400), retry text-only
+          if (parts.length > 1) {
+            const retryRes = await model.generateContent(prompt);
+            content = retryRes.response.text();
+          } else {
+            throw callWithBufferErr;
           }
         }
+
+        if (content) {
+          const parsed = JSON.parse(content) as AcademicExtractionData;
+          if (isCalendar) {
+            if (parsed.calendarEvents && parsed.calendarEvents.length > 0) {
+              return {
+                subjects: [],
+                timetableSlots: [],
+                calendarEvents: parsed.calendarEvents || [],
+                semesterDates: parsed.semesterDates,
+              };
+            }
+          } else {
+            if (parsed.subjects && parsed.subjects.length > 0) {
+              parsed.subjects = parsed.subjects.map((sub, idx) => ({
+                ...sub,
+                color: sub.color || PALETTE[idx % PALETTE.length],
+              }));
+              return {
+                subjects: parsed.subjects || [],
+                timetableSlots: parsed.timetableSlots || [],
+                calendarEvents: [],
+                semesterDates: parsed.semesterDates,
+              };
+            }
+          }
+        }
+      } catch (geminiError) {
+        console.warn(`Gemini model ${mName} attempt skipped:`, geminiError);
       }
-    } catch (geminiError) {
-      console.warn("Native Gemini multimodal extraction error:", geminiError);
     }
   }
 
@@ -274,6 +295,101 @@ function fallbackHeuristicParser(
 
   // IF CALENDAR: ONLY extract calendar events & holidays (Pongal, Diwali, Exams, etc.)
   if (isCalendar) {
+    const denseDateRegex = /^(\d{2})-([A-Za-z]{3})(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)?(.*)$/i;
+    const hasDenseFormat = lines.some((l) => denseDateRegex.test(l));
+
+    if (hasDenseFormat) {
+      // Specialized university calendar parser (e.g. Amrita Vishwa Vidyapeetham)
+      const rawEvents: ParsedCalendarEvent[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(denseDateRegex);
+        if (match) {
+          const day = match[1];
+          const mStr = match[2].toLowerCase();
+          const monthNum = monthMap[mStr];
+          if (!monthNum) continue;
+
+          const mInt = parseInt(monthNum, 10);
+          const year = mInt >= 6 ? 2026 : 2027;
+          const dateStr = `${year}-${monthNum}-${day}`;
+          const rest = (match[3] || "").trim();
+
+          let nextLine = (lines[i + 1] || "").trim();
+          let eventTitle = "";
+
+          if (/holiday/i.test(line) || /holiday/i.test(rest)) {
+            const cleanRest = rest.replace(/^[A-Za-z0-9\s]*Holiday\s*[-–]?\s*/i, "").trim();
+            eventTitle = cleanRest || "Holiday";
+          }
+
+          if (nextLine && !nextLine.match(denseDateRegex) && !nextLine.match(/^(?:date|day|tt|ttt|tv|details)/i)) {
+            if (/exam|midterm|end semester|commencement|reopening/i.test(nextLine)) {
+              rawEvents.push({
+                title: nextLine,
+                type: "Exam",
+                date: dateStr,
+                isHoliday: false,
+                description: nextLine,
+              });
+            } else if (!eventTitle || eventTitle === "Holiday") {
+              eventTitle = nextLine;
+            }
+          }
+
+          if (eventTitle) {
+            rawEvents.push({
+              title: eventTitle,
+              type: "Holiday",
+              date: dateStr,
+              isHoliday: true,
+              description: eventTitle,
+            });
+          }
+        }
+      }
+
+      // Group consecutive holiday events (e.g. Pongal holidays Jan 14 to Jan 17)
+      for (let i = 0; i < rawEvents.length; i++) {
+        const curr = rawEvents[i];
+        if (curr.type === "Holiday" && /pongal|uzhavar/i.test(curr.title)) {
+          let startDate = curr.date;
+          let endDate = curr.date;
+
+          while (i + 1 < rawEvents.length) {
+            const next = rawEvents[i + 1];
+            const currD = new Date(endDate);
+            const nextD = new Date(next.date);
+            const diffDays = Math.round((nextD.getTime() - currD.getTime()) / (1000 * 3600 * 24));
+            if (diffDays <= 2 && next.type === "Holiday") {
+              endDate = next.date;
+              i++;
+            } else {
+              break;
+            }
+          }
+
+          calendarEvents.push({
+            title: "Pongal Holidays",
+            type: "Holiday",
+            date: startDate,
+            endDate: endDate !== startDate ? endDate : undefined,
+            isHoliday: true,
+            description: "Pongal festival vacation",
+          });
+        } else if (curr.title && curr.title !== "Holiday") {
+          calendarEvents.push(curr);
+        }
+      }
+
+      return {
+        subjects: [],
+        timetableSlots: [],
+        calendarEvents,
+      };
+    }
+
     const currentYear = new Date().getFullYear();
 
     for (const line of lines) {

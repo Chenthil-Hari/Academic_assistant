@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/auth/middleware-utils";
 import { processUserMessage } from "@/lib/ai/assistant-service";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const { user, errorResponse } = await authenticateRequest(req);
