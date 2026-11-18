@@ -48,11 +48,18 @@ export async function parseAcademicDocument(
   rawText: string,
   docType: "timetable_pdf" | "academic_calendar_pdf" | "syllabus_pdf" | "other"
 ): Promise<AcademicExtractionData> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const isGemini = Boolean(geminiKey && geminiKey !== "your_gemini_api_key_here");
+  const apiKey = isGemini ? geminiKey : openaiKey;
+  const baseURL = isGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined;
+  const modelName = isGemini
+    ? process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
+    : process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   if (apiKey && apiKey !== "your_openai_api_key_here") {
     try {
-      const openai = new OpenAI({ apiKey });
+      const client = new OpenAI({ apiKey, baseURL });
 
       const prompt = `
 You are an expert academic document parser for "Academic AI".
@@ -106,8 +113,8 @@ DOCUMENT TEXT:
 ${rawText.slice(0, 8000)}
 `;
 
-      const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      const response = await client.chat.completions.create({
+        model: modelName,
         messages: [
           {
             role: "system",

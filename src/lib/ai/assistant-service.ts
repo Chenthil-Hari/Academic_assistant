@@ -44,14 +44,25 @@ export async function processUserMessage(params: {
     timestamp: new Date(),
   });
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const isGemini = Boolean(geminiKey && geminiKey !== "your_gemini_api_key_here");
+  const apiKey = isGemini ? geminiKey : openaiKey;
+  const baseURL = isGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : undefined;
+  const modelName = isGemini
+    ? process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
+    : process.env.OPENAI_MODEL || "gpt-4o-mini";
+
   let assistantReply = "";
   const toolCallsMade: string[] = [];
 
-  // Check if OpenAI API key is set
+  // Check if AI provider API key is set
   if (apiKey && apiKey !== "your_openai_api_key_here") {
     try {
-      const openai = new OpenAI({ apiKey });
+      const client = new OpenAI({
+        apiKey,
+        baseURL,
+      });
 
       // Build context messages from history (last 10 turns)
       const systemPrompt = `
@@ -83,8 +94,8 @@ CRITICAL RULES:
       }
 
       // Initial call with tools
-      const firstResponse = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      const firstResponse = await client.chat.completions.create({
+        model: modelName,
         messages: chatMessages,
         tools: AI_TOOLS_DEFINITIONS,
         tool_choice: "auto",
@@ -116,8 +127,8 @@ CRITICAL RULES:
         }
 
         // Get final synthesized answer
-        const secondResponse = await openai.chat.completions.create({
-          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        const secondResponse = await client.chat.completions.create({
+          model: modelName,
           messages: chatMessages,
           temperature: 0.2,
         });
