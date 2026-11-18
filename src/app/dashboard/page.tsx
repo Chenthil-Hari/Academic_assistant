@@ -385,16 +385,16 @@ export default function DashboardPage() {
                       )}
                     </div>
 
-                    <div className="mt-4 pt-3 border-t flex items-center justify-between">
+                    <div className="mt-4 pt-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <span className="text-[11px] font-medium text-muted-foreground">
                         Status: <strong className="text-foreground">{item.status}</strong>
                       </span>
 
-                      <div className="flex items-center gap-1">
+                      <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
                         <button
                           type="button"
                           onClick={() => handleUpdateCheckinStatus(item.attendanceId, "Attended")}
-                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                          className={`rounded-xl py-2 px-2 sm:py-1 sm:px-2.5 text-xs font-semibold text-center transition-all ${
                             item.status === "Attended"
                               ? "bg-emerald-600 text-white shadow-sm"
                               : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
@@ -405,7 +405,7 @@ export default function DashboardPage() {
                         <button
                           type="button"
                           onClick={() => handleUpdateCheckinStatus(item.attendanceId, "Absent")}
-                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                          className={`rounded-xl py-2 px-2 sm:py-1 sm:px-2.5 text-xs font-semibold text-center transition-all ${
                             item.status === "Absent"
                               ? "bg-red-600 text-white shadow-sm"
                               : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                         <button
                           type="button"
                           onClick={() => handleUpdateCheckinStatus(item.attendanceId, "Cancelled")}
-                          className={`rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
+                          className={`rounded-xl py-2 px-1.5 sm:py-1 sm:px-2 text-xs font-semibold text-center transition-all ${
                             item.status === "Cancelled"
                               ? "bg-zinc-600 text-white shadow-sm"
                               : "bg-muted text-muted-foreground hover:bg-muted/80"

@@ -11,6 +11,8 @@ import {
   Bot,
   User,
   ShieldCheck,
+  History,
+  X,
 } from "lucide-react";
 
 interface Message {
@@ -47,6 +49,7 @@ function AssistantChat() {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showHistoryMobile, setShowHistoryMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,6 +78,7 @@ function AssistantChat() {
 
   const handleSelectConversation = async (convId: string) => {
     setActiveConversationId(convId);
+    setShowHistoryMobile(false);
     try {
       const res = await fetch(`/api/conversations/${convId}`);
       const data = await res.json();
@@ -86,6 +90,7 @@ function AssistantChat() {
 
   const handleNewChat = () => {
     setActiveConversationId(null);
+    setShowHistoryMobile(false);
     setMessages([
       {
         role: "assistant",
@@ -175,9 +180,31 @@ function AssistantChat() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-140px)] gap-6 overflow-hidden">
-      {/* Sidebar: Conversation history */}
-      <div className="hidden md:flex w-72 flex-col rounded-3xl border bg-card/60 p-4 shadow-sm backdrop-blur-sm">
+    <div className="relative flex h-[calc(100dvh-135px)] md:h-[calc(100vh-140px)] gap-6 overflow-hidden">
+      {/* Mobile Drawer Backdrop */}
+      {showHistoryMobile && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setShowHistoryMobile(false)}
+        />
+      )}
+
+      {/* Sidebar: Conversation history (Desktop static, Mobile slide-in drawer) */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 flex-col rounded-r-3xl border-r bg-card p-4 shadow-2xl transition-transform duration-300 ease-in-out md:static md:z-0 md:flex md:rounded-3xl md:border md:bg-card/60 md:shadow-sm md:backdrop-blur-sm ${
+          showHistoryMobile ? "flex translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="flex items-center justify-between pb-2 md:hidden">
+          <span className="font-bold text-sm text-foreground">Chat History</span>
+          <button
+            onClick={() => setShowHistoryMobile(false)}
+            className="p-1 rounded-lg text-muted-foreground hover:bg-muted"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
         <button
           onClick={handleNewChat}
           className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 transition-all"
@@ -229,33 +256,43 @@ function AssistantChat() {
       {/* Main Chat Pane */}
       <div className="flex flex-1 flex-col rounded-3xl border bg-card/80 shadow-sm backdrop-blur-md overflow-hidden">
         {/* Chat Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-sm">
-              <Bot className="h-5 w-5" />
+        <div className="flex items-center justify-between border-b px-4 sm:px-6 py-3.5 sm:py-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-sm">
+              <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-extrabold text-sm text-foreground">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h2 className="font-extrabold text-xs sm:text-sm text-foreground">
                   Academic Assistant
                 </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-500">
                   <ShieldCheck className="h-3 w-3" />
                   <span>Grounded in DB</span>
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Authenticated queries • Zero hallucination on attendance & schedule
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground line-clamp-1">
+                Zero hallucination • MongoDB queries
               </p>
             </div>
           </div>
 
-          <button
-            onClick={handleNewChat}
-            className="md:hidden rounded-xl border p-2 text-muted-foreground hover:bg-muted"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5 md:hidden">
+            <button
+              onClick={() => setShowHistoryMobile(true)}
+              className="rounded-xl border p-2 text-muted-foreground hover:bg-muted"
+              title="Chat History"
+            >
+              <History className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleNewChat}
+              className="rounded-xl bg-primary/10 text-primary border border-primary/20 p-2 hover:bg-primary/20"
+              title="New Chat"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Messages list */}

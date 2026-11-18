@@ -392,7 +392,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Manual Checkin Test Trigger */}
-              <div className="flex items-center justify-between rounded-2xl border p-4 bg-primary/5 border-primary/20">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4 bg-primary/5 border-primary/20">
                 <div className="space-y-1">
                   <div className="font-bold text-foreground">Test Daily 4:00 PM Check-in</div>
                   <p className="text-muted-foreground text-[11px]">
@@ -404,7 +404,7 @@ export default function SettingsPage() {
                   type="button"
                   disabled={testCronRunning}
                   onClick={handleTriggerTestCheckin}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 shrink-0"
                 >
                   {testCronRunning ? (
                     <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -422,7 +422,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 rounded-2xl bg-primary px-8 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
             >
               {saving ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

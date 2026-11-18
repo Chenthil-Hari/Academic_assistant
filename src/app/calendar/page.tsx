@@ -35,6 +35,9 @@ export default function CalendarPage() {
 
   useEffect(() => {
     loadEvents();
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setViewType("list");
+    }
   }, [filterType]);
 
   const loadEvents = async () => {
@@ -209,71 +212,76 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {/* Weekdays header */}
-            <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground uppercase">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div key={day} className="py-2">
-                  {day}
+            {/* Weekdays and Days matrix with horizontal scroll on mobile */}
+            <div className="overflow-x-auto pb-2">
+              <div className="min-w-[580px] space-y-2">
+                {/* Weekdays header */}
+                <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground uppercase">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                    <div key={day} className="py-2">
+                      {day}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Days matrix */}
-            <div className="grid grid-cols-7 gap-1.5">
-              {/* Empty leading padding */}
-              {Array.from({ length: firstDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="min-h-24 rounded-2xl bg-muted/10 p-2" />
-              ))}
+                {/* Days matrix */}
+                <div className="grid grid-cols-7 gap-1.5">
+                  {/* Empty leading padding */}
+                  {Array.from({ length: firstDayIndex }).map((_, i) => (
+                    <div key={`empty-${i}`} className="min-h-24 rounded-2xl bg-muted/10 p-2" />
+                  ))}
 
-              {/* Month days */}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const dayNum = i + 1;
-                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-                const dayEvents = events.filter((e) => e.date.startsWith(dateStr));
+                  {/* Month days */}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const dayNum = i + 1;
+                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                    const dayEvents = events.filter((e) => e.date.startsWith(dateStr));
 
-                const isToday =
-                  new Date().getDate() === dayNum &&
-                  new Date().getMonth() === month &&
-                  new Date().getFullYear() === year;
+                    const isToday =
+                      new Date().getDate() === dayNum &&
+                      new Date().getMonth() === month &&
+                      new Date().getFullYear() === year;
 
-                return (
-                  <div
-                    key={dayNum}
-                    className={`min-h-24 rounded-2xl border p-2 flex flex-col justify-between transition-colors ${
-                      isToday ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "bg-card/60"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-xs font-bold ${
-                          isToday ? "text-primary" : "text-foreground"
+                    return (
+                      <div
+                        key={dayNum}
+                        className={`min-h-24 rounded-2xl border p-2 flex flex-col justify-between transition-colors ${
+                          isToday ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "bg-card/60"
                         }`}
                       >
-                        {dayNum}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1 mt-1 overflow-y-auto max-h-16">
-                      {dayEvents.map((ev) => (
-                        <div
-                          key={ev._id}
-                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold truncate ${
-                            ev.type === "Exam"
-                              ? "bg-red-500/15 text-red-500"
-                              : ev.type === "Assignment"
-                              ? "bg-amber-500/15 text-amber-500"
-                              : ev.type === "Holiday"
-                              ? "bg-emerald-500/15 text-emerald-500"
-                              : "bg-blue-500/15 text-blue-500"
-                          }`}
-                        >
-                          {ev.title}
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-xs font-bold ${
+                              isToday ? "text-primary" : "text-foreground"
+                            }`}
+                          >
+                            {dayNum}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+
+                        <div className="space-y-1 mt-1 overflow-y-auto max-h-16">
+                          {dayEvents.map((ev) => (
+                            <div
+                              key={ev._id}
+                              className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold truncate ${
+                                ev.type === "Exam"
+                                  ? "bg-red-500/15 text-red-500"
+                                  : ev.type === "Assignment"
+                                  ? "bg-amber-500/15 text-amber-500"
+                                  : ev.type === "Holiday"
+                                  ? "bg-emerald-500/15 text-emerald-500"
+                                  : "bg-blue-500/15 text-blue-500"
+                              }`}
+                            >
+                              {ev.title}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         ) : (
@@ -332,7 +340,7 @@ export default function CalendarPage() {
         {/* Add Event Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Add Academic Event</h3>
                 <button

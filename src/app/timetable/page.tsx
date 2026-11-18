@@ -45,6 +45,9 @@ export default function TimetablePage() {
 
   useEffect(() => {
     loadTimetable();
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setViewMode("daily");
+    }
   }, []);
 
   const loadTimetable = async () => {

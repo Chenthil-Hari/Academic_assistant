@@ -194,7 +194,7 @@ export default function AttendancePage() {
         </div>
 
         {/* Overall Summary Bar */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Overall Attendance
@@ -499,7 +499,7 @@ export default function AttendancePage() {
         {/* Bunk Calculator Modal */}
         {showBunkModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-5">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <div className="flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-primary" />
@@ -573,7 +573,7 @@ export default function AttendancePage() {
         {/* Edit Record Modal with Audit Log Reason */}
         {editRecord && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Edit Historical Attendance</h3>
                 <button
@@ -716,7 +716,7 @@ export default function AttendancePage() {
         {/* Add Subject Modal */}
         {showAddSubjectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Add New Subject</h3>
                 <button
@@ -801,7 +801,7 @@ export default function AttendancePage() {
         {/* Add Record Modal */}
         {showAddRecordModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Record Attendance</h3>
                 <button

@@ -59,6 +59,11 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+/* Safe area for mobile iPhones */
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

@@ -136,7 +136,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl border bg-card p-4 shadow-xl z-50">
+            <div className="absolute right-[-10px] sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border bg-card p-4 shadow-xl z-50">
               <div className="flex items-center justify-between pb-3 border-b">
                 <span className="font-semibold text-sm">Notifications</span>
                 {unreadCount > 0 && (

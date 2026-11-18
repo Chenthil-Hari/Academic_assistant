@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { MobileNav } from "./MobileNav";
 import { useRouter } from "next/navigation";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -52,9 +53,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 md:p-8 pb-24 md:pb-8">
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
+        <MobileNav onOpenMenu={() => setSidebarOpen(true)} />
       </div>
     </div>
   );

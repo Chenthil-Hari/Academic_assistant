@@ -44,11 +44,11 @@ export default function ReportsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             <a
               href="/api/reports/export-csv?type=summary"
               download
-              className="inline-flex items-center gap-2 rounded-xl border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all text-center"
             >
               <Download className="h-4 w-4 text-primary" />
               <span>Export Summary CSV</span>
@@ -57,7 +57,7 @@ export default function ReportsPage() {
             <a
               href="/api/reports/export-csv?type=logs"
               download
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all text-center"
             >
               <FileSpreadsheet className="h-4 w-4" />
               <span>Export Detailed Logs CSV</span>
