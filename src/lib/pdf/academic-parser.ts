@@ -59,7 +59,12 @@ export async function parseAcademicDocument(
 
   if (apiKey && apiKey !== "your_openai_api_key_here") {
     try {
-      const client = new OpenAI({ apiKey, baseURL });
+      const client = new OpenAI({
+        apiKey,
+        baseURL,
+        timeout: 8000,
+        maxRetries: 1,
+      });
 
       const prompt = `
 You are an expert academic document parser for "Academic AI".

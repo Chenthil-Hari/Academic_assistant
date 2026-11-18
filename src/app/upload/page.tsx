@@ -58,6 +58,9 @@ export default function UploadPage() {
     setUploading(true);
     setError("");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s safety limit
+
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -66,8 +69,10 @@ export default function UploadPage() {
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Failed to parse document.");
@@ -80,7 +85,12 @@ export default function UploadPage() {
       setCalendarEvents(data.extractedData?.calendarEvents || []);
       setStep("verify");
     } catch (err: any) {
-      setError(err.message || "Error processing PDF.");
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        setError("Extraction took longer than expected (>20s). Please ensure your PDF is clear or try again.");
+      } else {
+        setError(err.message || "Error processing PDF.");
+      }
     } finally {
       setUploading(false);
     }

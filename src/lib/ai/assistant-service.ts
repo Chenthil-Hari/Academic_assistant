@@ -62,6 +62,8 @@ export async function processUserMessage(params: {
       const client = new OpenAI({
         apiKey,
         baseURL,
+        timeout: 15000,
+        maxRetries: 1,
       });
 
       // Build context messages from history (last 10 turns)
