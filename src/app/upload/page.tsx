@@ -73,7 +73,19 @@ export default function UploadPage() {
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+
+      let data: any;
+      const responseText = await res.text();
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        throw new Error(
+          res.status === 504 || responseText.toLowerCase().includes("error")
+            ? "Server timeout processing the document. Please re-upload or check your file."
+            : `Server error (${res.status}): ${responseText.slice(0, 100)}`
+        );
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Failed to parse document.");
       }
