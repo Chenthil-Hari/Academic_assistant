@@ -75,13 +75,17 @@ export const AI_TOOLS_DEFINITIONS = [
     type: "function" as const,
     function: {
       name: "get_upcoming_academic_events",
-      description: "Retrieve upcoming exams, assignment deadlines, holidays, and academic calendar events.",
+      description: "Retrieve upcoming exams, assignment deadlines, holidays (e.g. Pongal, Diwali, National Holidays), or search for a specific holiday/exam by name.",
       parameters: {
         type: "object",
         properties: {
+          searchTerm: {
+            type: "string",
+            description: "Keyword or holiday name to search for (e.g. 'Pongal', 'Diwali', 'Midterm', 'Semester End', 'Christmas').",
+          },
           daysAhead: {
             type: "number",
-            description: "Number of days in future to look for events (default 30).",
+            description: "Number of days in future to look for events (default 180).",
           },
           eventType: {
             type: "string",
@@ -387,16 +391,20 @@ export async function executeAiTool(
     }
 
     case "get_upcoming_academic_events": {
-      const daysAhead = args.daysAhead || 30;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const futureDate = new Date(today);
-      futureDate.setDate(futureDate.getDate() + daysAhead);
+      const query: any = { userId: userObjectId };
 
-      const query: any = {
-        userId: userObjectId,
-        date: { $gte: today, $lte: futureDate },
-      };
+      if (args.searchTerm && typeof args.searchTerm === "string" && args.searchTerm.trim()) {
+        const term = args.searchTerm.trim();
+        const regex = new RegExp(term, "i");
+        query.$or = [{ title: regex }, { description: regex }];
+      } else {
+        const daysAhead = args.daysAhead || 180;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const futureDate = new Date(today);
+        futureDate.setDate(futureDate.getDate() + daysAhead);
+        query.date = { $gte: today, $lte: futureDate };
+      }
 
       if (args.eventType && args.eventType !== "All") {
         query.type = args.eventType;

@@ -330,94 +330,96 @@ export default function UploadPage() {
               </button>
             </div>
 
-            {/* Extracted Subjects Section - Always shown for verification */}
-            <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-base text-foreground">Detected Subjects ({subjects.length})</h3>
-                  <p className="text-xs text-muted-foreground">Verify subject codes, names, and credit weighting</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddEmptySubject}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add Subject</span>
-                </button>
-              </div>
-
-              {subjects.length === 0 ? (
-                <div className="rounded-2xl border border-dashed p-6 text-center space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    No subjects were automatically detected. Click below to add your subjects directly:
-                  </p>
+            {/* Extracted Subjects Section - Shown ONLY for Timetable PDF */}
+            {docType === "timetable_pdf" && (
+              <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">Detected Subjects ({subjects.length})</h3>
+                    <p className="text-xs text-muted-foreground">Verify subject codes, names, and credit weighting</p>
+                  </div>
                   <button
                     type="button"
                     onClick={handleAddEmptySubject}
-                    className="inline-flex items-center gap-1.5 rounded-xl border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
                   >
-                    <Plus className="h-4 w-4 text-primary" />
-                    <span>Add First Subject</span>
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Subject</span>
                   </button>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs min-w-[500px]">
-                    <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
-                      <tr>
-                        <th className="px-3 py-2 w-32">Code</th>
-                        <th className="px-3 py-2">Subject Name</th>
-                        <th className="px-3 py-2 w-24">Credits</th>
-                        <th className="px-3 py-2 text-right w-16">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {subjects.map((sub, idx) => (
-                        <tr key={idx}>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={sub.code}
-                              onChange={(e) => handleUpdateSubject(idx, "code", e.target.value.toUpperCase())}
-                              className="rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground w-full"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={sub.name}
-                              onChange={(e) => handleUpdateSubject(idx, "name", e.target.value)}
-                              className="rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground w-full"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={1}
-                              max={8}
-                              value={sub.credit || 3}
-                              onChange={(e) => handleUpdateSubject(idx, "credit", Number(e.target.value))}
-                              className="rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground w-full"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSubject(idx)}
-                              className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted"
-                              title="Remove Subject"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
+
+                {subjects.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed p-6 text-center space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      No subjects were automatically detected. Click below to add your subjects directly:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAddEmptySubject}
+                      className="inline-flex items-center gap-1.5 rounded-xl border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                    >
+                      <Plus className="h-4 w-4 text-primary" />
+                      <span>Add First Subject</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs min-w-[500px]">
+                      <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
+                        <tr>
+                          <th className="px-3 py-2 w-32">Code</th>
+                          <th className="px-3 py-2">Subject Name</th>
+                          <th className="px-3 py-2 w-24">Credits</th>
+                          <th className="px-3 py-2 text-right w-16">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {subjects.map((sub, idx) => (
+                          <tr key={idx}>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={sub.code}
+                                onChange={(e) => handleUpdateSubject(idx, "code", e.target.value.toUpperCase())}
+                                className="rounded-lg border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground w-full"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={sub.name}
+                                onChange={(e) => handleUpdateSubject(idx, "name", e.target.value)}
+                                className="rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground w-full"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min={1}
+                                max={8}
+                                value={sub.credit || 3}
+                                onChange={(e) => handleUpdateSubject(idx, "credit", Number(e.target.value))}
+                                className="rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground w-full"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSubject(idx)}
+                                className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted"
+                                title="Remove Subject"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Extracted Timetable Slots */}
             {docType === "timetable_pdf" && (

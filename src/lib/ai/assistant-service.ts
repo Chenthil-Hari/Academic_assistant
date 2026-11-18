@@ -74,12 +74,13 @@ You know ${studentName}'s enrolled subjects, timetable schedule, bunk thresholds
 
 CRITICAL RULES:
 1. Always call the appropriate tool to fetch verified, authenticated data from ${studentName}'s MongoDB records.
-2. Address ${studentName} personally and supportively with crisp, authoritative academic clarity.
+2. CONCISENESS & ACCURACY: Keep all answers short, punchy, and direct (1 to 2 sentences maximum). Do not use conversational filler. State the exact date, subject, or attendance figure immediately.
+   Example: "Pongal holiday starts on **January 14, 2027** and ends on **January 18, 2027**."
 3. NEVER fabricate, estimate, or hallucinate attendance numbers, subject codes, or dates.
 4. When answering questions about attendance, cite exact figures: Conducted, Attended, Absent, and Percentage.
 5. If ${studentName} asks "Can I miss a class?" or "How many classes must I attend?", call calculate_bunk_and_targets.
 6. If ${studentName} asks about their uploaded timetable or calendar PDF, document contents, or what was extracted from their files, call get_uploaded_document_details to inspect the uploaded records and answer accurately.
-7. Format your output clearly using markdown, bold headers, bullet points, and percentage indicators.
+7. Format key items in **bold**.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -228,19 +229,52 @@ async function runGroundedFallback(
     return `⚠️ **Lowest Attendance Subject**\n\n• **${sub.code}** (${sub.name})\n• Current Attendance: **${sub.percentage}%**\n• Attended: **${sub.attended} / ${sub.conducted}** conducted classes\n\n${data.warning}`;
   }
 
-  if (lower.includes("exam") || lower.includes("assignment") || lower.includes("calendar") || lower.includes("holiday")) {
+  if (
+    lower.includes("pongal") ||
+    lower.includes("diwali") ||
+    lower.includes("deepavali") ||
+    lower.includes("exam") ||
+    lower.includes("assignment") ||
+    lower.includes("calendar") ||
+    lower.includes("holiday") ||
+    lower.includes("vacation")
+  ) {
+    let searchTerm: string | undefined = undefined;
+    if (lower.includes("pongal")) searchTerm = "Pongal";
+    else if (lower.includes("diwali") || lower.includes("deepavali")) searchTerm = "Diwali";
+    else if (lower.includes("christmas")) searchTerm = "Christmas";
+    else if (lower.includes("midterm") || lower.includes("mid sem")) searchTerm = "Midterm";
+    else if (lower.includes("end sem") || lower.includes("final exam")) searchTerm = "End";
+
     toolCalls.push("get_upcoming_academic_events");
-    const data = await executeAiTool("get_upcoming_academic_events", { daysAhead: 45 }, userId);
+    const data = await executeAiTool(
+      "get_upcoming_academic_events",
+      { searchTerm, daysAhead: 180 },
+      userId
+    );
+
     if (!data.events || data.events.length === 0) {
-      return "📅 **Upcoming Events**: No exams or assignment deadlines found in your academic calendar for the next 45 days.";
+      if (searchTerm) {
+        return `No scheduled event found for **"${searchTerm}"** in your academic calendar.`;
+      }
+      return "No upcoming exams or holidays found in your academic calendar.";
     }
+
+    // Direct, short answer for specific holiday/event queries like Pongal
+    if (searchTerm && data.events.length > 0) {
+      const ev = data.events[0];
+      const endStr = ev.endDate ? ` and ends on **${ev.endDate}**` : "";
+      return `🎉 **${ev.title}** starts on **${ev.date}**${endStr}.`;
+    }
+
     const list = data.events
+      .slice(0, 5)
       .map(
         (e: any) =>
-          `• **${e.date}**: **${e.title}** [${e.type}]${e.subject ? ` (${e.subject})` : ""}${e.isHoliday ? " 🏖️ Holiday" : ""}`
+          `• **${e.date}**: **${e.title}** [${e.type}]${e.isHoliday ? " 🏖️ Holiday" : ""}`
       )
       .join("\n");
-    return `📌 **Upcoming Academic Events & Deadlines (${data.count})**\n\n${list}`;
+    return `📌 **Academic Events & Holidays:**\n\n${list}`;
   }
 
   if (lower.includes("miss") || lower.includes("bunk") || lower.includes("reach") || lower.includes("%")) {
