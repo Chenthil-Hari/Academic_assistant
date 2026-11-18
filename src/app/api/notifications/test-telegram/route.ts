@@ -15,11 +15,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const chatId = (body.chatId || "").trim();
 
-    if (!process.env.TELEGRAM_BOT_TOKEN) {
+    const token = process.env.TELEGRAM_BOT_TOKEN || "9007972451:AAF5VHHnHgRyNed_fmmBBreaJKVIbU5WlmA";
+
+    if (!token) {
       return NextResponse.json(
         {
           success: false,
-          message: "TELEGRAM_BOT_TOKEN is not set in environment variables. Please add it to your .env.local and Vercel settings.",
+          message: "TELEGRAM_BOT_TOKEN is not set in environment variables.",
         },
         { status: 400 }
       );

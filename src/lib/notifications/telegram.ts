@@ -2,7 +2,7 @@ export async function sendTelegramAlert(
   chatId: string,
   message: string
 ): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || "9007972451:AAF5VHHnHgRyNed_fmmBBreaJKVIbU5WlmA";
   if (!token || !chatId) {
     return false;
   }
