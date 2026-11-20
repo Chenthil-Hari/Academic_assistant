@@ -6,11 +6,14 @@ import { Attendance } from "@/lib/db/models/Attendance";
 import { ClassSession } from "@/lib/db/models/ClassSession";
 import { createAuditLog } from "@/lib/db/audit";
 import { getOrCreateDailyCheckin } from "@/lib/attendance/session-generator";
-import { processUserMessage } from "@/lib/ai/assistant-service";
+import { processUserMessage, transcribeAudioBuffer } from "@/lib/ai/assistant-service";
 import {
   sendTelegramAlert,
   answerTelegramCallbackQuery,
   editTelegramMessage,
+  downloadTelegramFile,
+  sendTelegramVoice,
+  generateTtsAudio,
 } from "@/lib/notifications/telegram";
 
 export const dynamic = "force-dynamic";
@@ -134,16 +137,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // ─── 2. Handle Text Messages and Commands ───
+    // ─── 2. Handle Text Messages, Commands, and Voice Notes ───
     if (!body.message) {
       return NextResponse.json({ ok: true });
     }
 
     const { message } = body;
     const chatId = String(message.chat?.id || "");
-    const text = (message.text || "").trim();
+    const voiceObj = message.voice || message.audio;
+    let text = (message.text || "").trim();
 
-    if (!chatId || !text) {
+    if (!chatId || (!text && !voiceObj)) {
       return NextResponse.json({ ok: true });
     }
 
@@ -169,19 +173,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // ─── If Incoming Message is a Voice Note (.ogg / .mp3) ───
+    const isVoiceMessage = Boolean(voiceObj && voiceObj.file_id);
+    if (isVoiceMessage) {
+      try {
+        // Send "record_voice" typing action
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, action: "record_voice" }),
+        });
+
+        // 1. Download voice note file from Telegram
+        const downloaded = await downloadTelegramFile(voiceObj.file_id);
+        if (downloaded) {
+          // 2. Transcribe voice note using Google Gemini
+          text = await transcribeAudioBuffer(downloaded.buffer, downloaded.mimeType);
+        }
+      } catch (voiceErr: any) {
+        console.error("Voice note transcription error:", voiceErr);
+        await sendTelegramAlert(chatId, "⚠️ Could not transcribe your voice note. Please try speaking again or send text.");
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    if (!text) {
+      await sendTelegramAlert(chatId, "⚠️ Could not hear any speech in your voice note. Please try again.");
+      return NextResponse.json({ ok: true });
+    }
+
     // Handle /start command
     if (text === "/start") {
-      const welcomeMsg = `👋 *Welcome to Academic AI Assistant, ${user.name || "Hari"}!*\n\nI am your personal AI student operating system. You can ask me anything about your academic schedule right here in Telegram!\n\n💡 *Try asking me:*\n• _What is the class now?_\n• _What classes do I have today?_\n• _How is my attendance?_\n• _Can I bunk Software Engineering?_\n• _When is the Pongal holiday?_\n\n👉 [Open Academic AI](https://hari07.tech)`;
+      const welcomeMsg = `👋 *Welcome to Academic AI Voice & Text Assistant, ${user.name || "Hari"}!*\n\nI am your personal AI student operating system. You can ask me anything about your academic schedule by text OR by holding the 🎙️ **Voice Note** button!\n\n💡 *Try asking me by voice or text:*\n• _"What is the class now?"_\n• _"What classes do I have today?"_\n• _"How is my attendance in DBMS?"_\n• _"Can I bunk Computer Networks?"_\n• _"When is my next exam?"_\n\n👉 [Open Academic AI](https://hari07.tech)`;
       await sendTelegramAlert(chatId, welcomeMsg);
       return NextResponse.json({ ok: true });
     }
 
-    // Send "typing..." action so Telegram UI shows typing indicator
+    // Send "typing..." action so Telegram UI shows action indicator
     try {
+      const actionType = isVoiceMessage ? "record_voice" : "typing";
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, action: "typing" }),
+        body: JSON.stringify({ chat_id: chatId, action: actionType }),
       });
     } catch (e) {}
 
@@ -207,7 +241,23 @@ export async function POST(req: NextRequest) {
 
     const replyText = result.response || "I could not retrieve an answer for that.";
 
-    // Deliver response directly to Telegram
+    // ─── If User Sent a Voice Note: Reply with Spoken Voice Note + Caption ───
+    if (isVoiceMessage) {
+      try {
+        const spokenAudioBuffer = await generateTtsAudio(replyText);
+        if (spokenAudioBuffer) {
+          const caption = `🎙️ *Academic AI:* ${replyText}\n\n*(Transcribed: "${text}")*`;
+          const sent = await sendTelegramVoice(chatId, spokenAudioBuffer, caption);
+          if (sent) {
+            return NextResponse.json({ ok: true });
+          }
+        }
+      } catch (ttsErr) {
+        console.error("Telegram voice note generation error:", ttsErr);
+      }
+    }
+
+    // Standard text delivery fallback
     await sendTelegramAlert(chatId, replyText);
 
     return NextResponse.json({ ok: true });
