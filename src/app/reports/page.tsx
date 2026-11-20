@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   CheckCircle,
   FileText,
+  Printer,
 } from "lucide-react";
 
 export default function ReportsPage() {
@@ -45,6 +46,13 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
+            >
+              <Printer className="h-4 w-4 text-muted-foreground" />
+              <span>Print Report</span>
+            </button>
             <a
               href="/api/reports/export-csv?type=summary"
               download
@@ -64,6 +72,15 @@ export default function ReportsPage() {
             </a>
           </div>
         </div>
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-3xl border bg-muted/40 p-6 h-28" />
+            ))}
+          </div>
+        )}
 
         {/* Analytics Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

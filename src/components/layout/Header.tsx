@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Menu,
@@ -26,6 +26,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const notifRef = useRef<HTMLDivElement>(null); // BUG FIX: for outside-click close
 
   useEffect(() => {
     // Fetch current user
@@ -41,6 +42,18 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     // Fetch unread notifications
     fetchNotifications();
   }, []);
+
+  // BUG FIX: Close notification panel on outside click
+  useEffect(() => {
+    if (!showNotifications) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showNotifications]);
 
   const fetchNotifications = async () => {
     try {
@@ -117,11 +130,11 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all"
         >
           <CheckCircle className="h-3.5 w-3.5" />
-          <span className="hidden xs:inline">Check-in</span>
+          <span className="hidden sm:inline">Check-in</span>
         </Link>
 
         {/* Notifications Dropdown */}
-        <div className="relative">
+        <div className="relative" ref={notifRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             className="relative rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

@@ -28,7 +28,12 @@ const DAYS = [
 export default function TimetablePage() {
   const [slots, setSlots] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [activeDay, setActiveDay] = useState(new Date().getDay() || 1); // default today or Mon
+  const [activeDay, setActiveDay] = useState(() => {
+    // getDay(): 0=Sun,1=Mon,...,6=Sat. DAYS only has 1-6.
+    // On Sunday (0) or if somehow 7, default to Monday (1).
+    const today = new Date().getDay();
+    return today >= 1 && today <= 6 ? today : 1;
+  });
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("weekly");
   const [loading, setLoading] = useState(true);
 
@@ -446,7 +451,14 @@ export default function TimetablePage() {
                       type="time"
                       required
                       value={newSlot.startTime}
-                      onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
+                      onChange={(e) => {
+                        const start = e.target.value;
+                        // Auto-advance end time to start + 1 hour for convenience
+                        const [h, m] = start.split(":").map(Number);
+                        const endH = String((h + 1) % 24).padStart(2, "0");
+                        const autoEnd = `${endH}:${String(m).padStart(2, "0")}`;
+                        setNewSlot({ ...newSlot, startTime: start, endTime: newSlot.endTime <= start ? autoEnd : newSlot.endTime });
+                      }}
                       className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
                     />
                   </div>
@@ -615,8 +627,9 @@ export default function TimetablePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setShowEditModal(false);
+                      // BUG FIX: confirm first (inside handleDeleteSlot), then close modal only if confirmed
                       handleDeleteSlot(editingSlot.id);
+                      setShowEditModal(false);
                     }}
                     className="rounded-xl px-3 py-2 text-destructive hover:bg-destructive/10 font-semibold flex items-center gap-1.5"
                   >

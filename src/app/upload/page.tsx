@@ -171,6 +171,17 @@ export default function UploadPage() {
     setSaving(true);
     setError("");
 
+    // BUG FIX: validate timetable slot times before saving
+    if (docType === "timetable_pdf") {
+      for (const slot of timetableSlots) {
+        if (slot.startTime && slot.endTime && slot.endTime <= slot.startTime) {
+          setError(`Slot for "${slot.subjectCode}" on day ${slot.dayOfWeek}: end time (${slot.endTime}) must be after start time (${slot.startTime}).`);
+          setSaving(false);
+          return;
+        }
+      }
+    }
+
     try {
       const res = await fetch("/api/upload/confirm", {
         method: "POST",

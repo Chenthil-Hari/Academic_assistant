@@ -38,7 +38,7 @@ export default function CalendarPage() {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setViewType("list");
     }
-  }, [filterType]);
+  }, [filterType, currentDate]); // BUG FIX: re-fetch when month changes too
 
   const loadEvents = async () => {
     setLoading(true);
@@ -235,7 +235,10 @@ export default function CalendarPage() {
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const dayNum = i + 1;
                     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-                    const dayEvents = events.filter((e) => e.date.startsWith(dateStr));
+                    // BUG FIX: apply filterType to month grid, not just list view
+                    const dayEvents = events
+                      .filter((e) => e.date.startsWith(dateStr))
+                      .filter((e) => filterType === "All" || e.type === filterType);
 
                     const isToday =
                       new Date().getDate() === dayNum &&

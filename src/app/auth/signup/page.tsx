@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GraduationCap, ArrowRight, Lock, Mail, User, School, AlertCircle } from "lucide-react";
+import { GraduationCap, ArrowRight, Lock, Mail, User, School, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function SignupPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -111,16 +112,56 @@ export default function SignupPage() {
             <div className="relative">
               <Lock className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 required
                 minLength={6}
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="At least 6 characters"
-                className="w-full rounded-xl border bg-background/80 py-2.5 pl-10 pr-4 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-xl border bg-background/80 py-2.5 pl-10 pr-10 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
+            {/* Password strength indicator */}
+            {formData.password.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map((level) => {
+                    const strength = formData.password.length >= 12 ? 4
+                      : formData.password.length >= 8 ? 3
+                      : formData.password.length >= 6 ? 2 : 1;
+                    return (
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-all ${
+                          level <= strength
+                            ? strength === 1 ? "bg-red-500"
+                              : strength === 2 ? "bg-amber-500"
+                              : strength === 3 ? "bg-blue-500"
+                              : "bg-emerald-500"
+                            : "bg-muted"
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {formData.password.length < 6 ? "Too short"
+                    : formData.password.length < 8 ? "Fair – try longer"
+                    : formData.password.length < 12 ? "Good"
+                    : "Strong"}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -39,6 +39,10 @@ export default function AttendancePage() {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [editRecord, setEditRecord] = useState<any>(null);
 
+  // Bunk Simulator state
+  const [simFutureConducted, setSimFutureConducted] = useState(0);
+  const [simFutureAttended, setSimFutureAttended] = useState(0);
+
   // Form states
   const [newSubject, setNewSubject] = useState({ code: "", name: "", credit: 3, minAttendanceThreshold: 75 });
   const [newRecord, setNewRecord] = useState({ subjectId: "", date: new Date().toISOString().split("T")[0], status: "Attended", notes: "" });
@@ -125,6 +129,21 @@ export default function AttendancePage() {
       }
     } catch (err) {
       alert("Error saving record.");
+    }
+  };
+
+  const handleDeleteSubject = async (subjectId: string, subjectCode: string) => {
+    if (!confirm(`Delete subject "${subjectCode}" and all its attendance records? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/subjects/${subjectId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        loadData();
+      } else {
+        alert(data.message || "Failed to delete subject.");
+      }
+    } catch (err) {
+      alert("Error deleting subject.");
     }
   };
 
@@ -356,9 +375,18 @@ export default function AttendancePage() {
                       </span>
                     )}
 
-                    <span className="text-[11px] text-muted-foreground">
-                      Cancelled: {sub.cancelled}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        Cancelled: {sub.cancelled}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteSubject(sub.subjectId, sub.subjectCode)}
+                        className="p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Delete subject"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -557,6 +585,50 @@ export default function AttendancePage() {
                       Your attendance is exactly on target. Any missed class will trigger a deficit.
                     </div>
                   )}
+                </div>
+
+                {/* Interactive What-If Simulator */}
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                  <div className="font-bold text-foreground text-sm">🧮 What-If Simulator</div>
+                  <p className="text-muted-foreground text-[11px]">Simulate future classes to predict your attendance %.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-foreground">Future classes conducted</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={200}
+                        value={simFutureConducted}
+                        onChange={(e) => setSimFutureConducted(Math.max(0, Number(e.target.value)))}
+                        className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-foreground">Of which you attend</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={simFutureConducted}
+                        value={simFutureAttended}
+                        onChange={(e) => setSimFutureAttended(Math.min(simFutureConducted, Math.max(0, Number(e.target.value))))}
+                        className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  {simFutureConducted > 0 && (() => {
+                    const newAttended = (overall?.totalAttended || 0) + simFutureAttended;
+                    const newConducted = (overall?.totalConducted || 0) + simFutureConducted;
+                    const newPct = newConducted === 0 ? 100 : Number(((newAttended / newConducted) * 100).toFixed(1));
+                    const isAbove = newPct >= targetPct;
+                    return (
+                      <div className={`rounded-xl p-3 ${isAbove ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
+                        <div className="font-bold">Projected attendance: {newPct}%</div>
+                        <div className="text-[11px] mt-0.5 text-muted-foreground">
+                          {isAbove ? `✅ You'll be ${(newPct - targetPct).toFixed(1)}% above target.` : `❌ You'll be ${(targetPct - newPct).toFixed(1)}% below target.`}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

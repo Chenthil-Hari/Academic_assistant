@@ -75,7 +75,7 @@ export default function SettingsPage() {
   };
 
   const checkPushSupport = () => {
-    if (!("Notification" in window)) {
+    if (typeof window === "undefined" || !("Notification" in window)) {
       setPushStatus("Not supported in this browser");
     } else {
       setPushStatus(Notification.permission);
@@ -83,8 +83,8 @@ export default function SettingsPage() {
   };
 
   const handleRequestPushPermission = async () => {
-    if (!("Notification" in window)) {
-      alert("Browser notifications not supported in this browser.");
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setMessage({ type: "error", text: "Browser notifications not supported in this browser." });
       return;
     }
 

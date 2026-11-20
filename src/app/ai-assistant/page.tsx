@@ -51,13 +51,16 @@ function AssistantChat() {
   const [loading, setLoading] = useState(false);
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialQueryFired = useRef(false); // BUG FIX: prevent double-fire of initial query
 
   useEffect(() => {
     loadConversations();
   }, []);
 
   useEffect(() => {
-    if (initialQuery && !loading) {
+    // BUG FIX: use ref so initialQuery only fires once and doesn't depend on stale `loading`
+    if (initialQuery && !initialQueryFired.current) {
+      initialQueryFired.current = true;
       sendMessage(initialQuery);
     }
   }, [initialQuery]);

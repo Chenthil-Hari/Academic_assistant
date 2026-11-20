@@ -36,6 +36,7 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     setLoading(true);
+    setCheckinMessage(""); // BUG FIX: clear stale success messages on re-fetch
     try {
       const [statsRes, checkinRes, eventsRes, userRes] = await Promise.all([
         fetch("/api/attendance/stats"),
@@ -118,7 +119,7 @@ export default function DashboardPage() {
               <span>Personal Student OS</span>
             </div>
             <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-              Welcome back, {user?.name || "Hari"} 👋
+              Welcome back, {user?.name || "Student"} 👋
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Your personal timetable, real-time attendance calculations & daily 4:00 PM check-ins
@@ -160,7 +161,7 @@ export default function DashboardPage() {
                     : "bg-red-500/10 text-red-500"
                 }`}
               >
-                {overall?.status || "Safe"}
+                {overall?.status || (loading ? "--" : "Safe")}
               </span>
             </div>
 
