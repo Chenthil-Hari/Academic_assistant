@@ -26,9 +26,9 @@ interface Message {
 
 const QUICK_PROMPTS = [
   "What classes do I have today?",
+  "What is my max achievable attendance this semester?",
   "What is my attendance summary?",
   "How many classes can I miss?",
-  "How many classes must I attend to reach 80%?",
   "Which subject has the lowest attendance?",
   "What exams are coming up?",
   "Summarize my academic week.",

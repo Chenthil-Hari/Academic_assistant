@@ -18,6 +18,8 @@ import {
   X,
   MinusCircle,
   ArrowRight,
+  CalendarCheck,
+  Target,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 
@@ -302,6 +304,98 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* End-of-Semester Forecast Card */}
+        {stats?.semesterPredictions && stats.semesterPredictions.totalRemainingClasses > 0 && (
+          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500">
+                  <CalendarCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">
+                    End-of-Semester Attendance Predictor
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Cross-referenced with weekly timetable & academic calendar ({stats.semesterPredictions.daysRemaining} days until {stats.semesterPredictions.semesterEndDate})
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  stats.semesterPredictions.canReachOverallTarget
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : "bg-red-500/10 text-red-500"
+                }`}
+              >
+                {stats.semesterPredictions.canReachOverallTarget
+                  ? "Target Achievable"
+                  : "Attendance Shortage Warning"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="rounded-2xl border bg-muted/20 p-4 space-y-1">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Remaining Classes
+                </span>
+                <div className="text-2xl sm:text-3xl font-black text-foreground">
+                  {stats.semesterPredictions.totalRemainingClasses}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Excludes {stats.semesterPredictions.holidaysCount} holidays
+                </p>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/20 p-4 space-y-1">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Max Achievable
+                </span>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-500">
+                  {stats.semesterPredictions.maxAchievableOverallPercentage}%
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  If 100% attended from now
+                </p>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/20 p-4 space-y-1">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Must Attend
+                </span>
+                <div className="text-2xl sm:text-3xl font-black text-foreground">
+                  {stats.semesterPredictions.totalClassesNeededOfRemaining}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Classes needed for {targetPct}%
+                </p>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/20 p-4 space-y-1">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Can Bunk Safely
+                </span>
+                <div className="text-2xl sm:text-3xl font-black text-primary">
+                  {stats.semesterPredictions.totalCanMissOfRemaining}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Remaining classes can miss
+                </p>
+              </div>
+            </div>
+
+            {/* Quick alert if any subject is cannot reach target */}
+            {stats.semesterPredictions.subjects.some((s: any) => !s.canReachTarget) && (
+              <div className="flex items-center gap-2 rounded-2xl bg-red-500/10 p-3 text-xs text-red-500 border border-red-500/20">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  <strong>Shortage Alert:</strong> One or more subjects cannot mathematically reach the minimum attendance target even with 100% future attendance. Check Reports for details.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Daily 4 PM Check-in Banner & Interactive Checklist */}
         <div className="rounded-3xl border bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 p-6 backdrop-blur-md shadow-sm">

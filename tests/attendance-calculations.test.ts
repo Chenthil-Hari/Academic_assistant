@@ -3,6 +3,7 @@ import {
   calculateMaxClassesCanMiss,
   calculateSubjectMetrics,
   calculateOverallMetrics,
+  calculateSemesterPredictions,
 } from "../src/lib/attendance/calculations";
 
 function assert(condition: boolean, message: string) {
@@ -78,4 +79,34 @@ assert(overall.lowestAttendanceSubject?.subjectCode === "CN", `Expected lowest s
 assert(overall.lowestAttendanceSubject?.percentage === 50, `Expected lowest pct to be 50, got ${overall.lowestAttendanceSubject?.percentage}`);
 console.log("✓ Test 4 passed: Lowest attendance subject correctly identified as CN at 50%.");
 
-console.log("\nALL ATTENDANCE ENGINE UNIT TESTS PASSED SUCCESSFULLY! (4/4)\n");
+// TEST 5: End-of-Semester Attendance Predictor
+// Subject: DBMS has 15 attended, 20 conducted (75%).
+// Suppose 10 remaining classes are scheduled before semester end.
+// Total semester conducted will be 20 + 10 = 30.
+// Max achievable if 100% attended: (15 + 10) / 30 = 25 / 30 = 83.3%.
+// Min if 0% attended: 15 / 30 = 50.0%.
+// Target = 75% -> min attended needed in semester: ceil(0.75 * 30) = 23.
+// Classes needed of remaining: 23 - 15 = 8 classes.
+// Max classes can miss of remaining: 10 - 8 = 2 classes!
+const fakeStartDate = new Date("2026-11-20");
+const predictions = calculateSemesterPredictions({
+  subjects: [metrics1],
+  timetableSlots: [
+    { subjectId: "sub-1", dayOfWeek: 1 }, // Monday
+    { subjectId: "sub-1", dayOfWeek: 3 }, // Wednesday
+  ],
+  academicEvents: [
+    { type: "SemesterEnd", date: new Date("2026-12-25") },
+    { type: "Holiday", date: new Date("2026-11-23"), isHoliday: true }, // Monday Nov 23 holiday
+  ],
+  targetPercentage: 75,
+  startDate: fakeStartDate,
+});
+
+const subPred = predictions.subjects[0];
+assert(subPred.remainingClasses === 9, `Expected remainingClasses=9, got ${subPred.remainingClasses}`);
+assert(subPred.maxAchievablePercentage === 82.8, `Expected maxAchievable=82.8%, got ${subPred.maxAchievablePercentage}%`);
+assert(subPred.canReachTarget === true, `Expected canReachTarget=true`);
+console.log(`✓ Test 5 passed: End-of-Semester prediction accurately computes remaining classes (${subPred.remainingClasses}), max achievable (${subPred.maxAchievablePercentage}%), and remaining miss buffer (${subPred.maxCanMissOfRemaining}).`);
+
+console.log("\nALL ATTENDANCE ENGINE UNIT TESTS PASSED SUCCESSFULLY! (5/5)\n");

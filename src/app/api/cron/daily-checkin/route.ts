@@ -114,8 +114,22 @@ async function handleCheckin(req: NextRequest) {
             .map((i) => `• ${i.subjectCode} (${i.startTime} - ${i.endTime}): *${i.status}*`)
             .join("\n");
 
-          const tgMessage = `🔔 *Academic AI - 4:00 PM Daily Check-in*\n\n${message}\n\n*Today's Schedule:*\n${classList}\n\n👉 [Open Academic AI Attendance](${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/attendance)`;
-          telegramSent = await sendTelegramAlert(u.telegramChatId, tgMessage);
+          const todayIso = now.toISOString().split("T")[0];
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hari07.tech";
+
+          const tgMessage = `🔔 *Academic AI - 4:00 PM Daily Check-in*\n\n${message}\n\n*Today's Schedule:*\n${classList}\n\n👉 Tap below to mark all attended or review individual classes:`;
+
+          // Interactive 1-Tap Inline Keyboard
+          const replyMarkup = {
+            inline_keyboard: [
+              [
+                { text: "✅ Mark All Attended", callback_data: `checkin_all_${todayIso}` },
+                { text: "📝 Review in App", url: `${appUrl}/attendance` },
+              ],
+            ],
+          };
+
+          telegramSent = await sendTelegramAlert(u.telegramChatId, tgMessage, replyMarkup);
         }
 
         results.push({

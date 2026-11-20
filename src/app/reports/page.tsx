@@ -269,6 +269,91 @@ export default function ReportsPage() {
             </table>
           </div>
         </div>
+
+        {/* End-of-Semester Prediction Report Table */}
+        {stats?.semesterPredictions && (
+          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b">
+              <div>
+                <h2 className="text-base font-bold text-foreground">
+                  End-of-Semester Attendance Projections & Feasibility
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Predicted based on timetable schedules through semester end ({stats.semesterPredictions.semesterEndDate}).
+                  Excludes {stats.semesterPredictions.holidaysCount} academic holiday(s).
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                  {stats.semesterPredictions.totalRemainingClasses} classes remaining
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    stats.semesterPredictions.canReachOverallTarget
+                      ? "bg-emerald-500/10 text-emerald-500"
+                      : "bg-red-500/10 text-red-500"
+                  }`}
+                >
+                  Max Possible: {stats.semesterPredictions.maxAchievableOverallPercentage}%
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
+                  <tr>
+                    <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Subject</th>
+                    <th className="px-4 py-3">Current %</th>
+                    <th className="px-4 py-3">Remaining</th>
+                    <th className="px-4 py-3">Max Achievable</th>
+                    <th className="px-4 py-3">Min Floor</th>
+                    <th className="px-4 py-3">Must Attend</th>
+                    <th className="px-4 py-3">Can Bunk</th>
+                    <th className="px-4 py-3">Feasibility</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {stats.semesterPredictions.subjects.map((sub: any) => (
+                    <tr key={sub.subjectId} className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-extrabold text-foreground">{sub.subjectCode}</td>
+                      <td className="px-4 py-3 text-muted-foreground truncate max-w-[160px]">{sub.subjectName}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{sub.currentPercentage}%</td>
+                      <td className="px-4 py-3 font-bold text-foreground">{sub.remainingClasses}</td>
+                      <td className="px-4 py-3 font-black text-emerald-500">{sub.maxAchievablePercentage}%</td>
+                      <td className="px-4 py-3 text-muted-foreground">{sub.minAttendancePercentage}%</td>
+                      <td className="px-4 py-3 font-bold text-foreground">
+                        {sub.classesNeededOfRemaining} / {sub.remainingClasses}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-primary">
+                        {sub.canReachTarget ? `${sub.maxCanMissOfRemaining} class(es)` : "0"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                            sub.status === "Safe"
+                              ? "bg-emerald-500/10 text-emerald-500"
+                              : sub.status === "AtRisk"
+                              ? "bg-amber-500/10 text-amber-500"
+                              : "bg-red-500/10 text-red-500"
+                          }`}
+                        >
+                          {sub.status === "Safe"
+                            ? "Safe"
+                            : sub.status === "AtRisk"
+                            ? "At Risk"
+                            : "Shortage Alert"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

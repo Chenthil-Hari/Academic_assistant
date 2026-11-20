@@ -4,9 +4,12 @@ import connectToDatabase from "@/lib/db/connection";
 import { User } from "@/lib/db/models/User";
 import { Subject } from "@/lib/db/models/Subject";
 import { Attendance } from "@/lib/db/models/Attendance";
+import { Timetable } from "@/lib/db/models/Timetable";
+import { AcademicEvent } from "@/lib/db/models/AcademicEvent";
 import {
   calculateSubjectMetrics,
   calculateOverallMetrics,
+  calculateSemesterPredictions,
   SubjectAttendanceMetrics,
 } from "@/lib/attendance/calculations";
 
@@ -70,11 +73,33 @@ export async function GET(req: NextRequest) {
 
     const overallMetrics = calculateOverallMetrics(subjectMetrics, defaultTarget);
 
+    // Cross-reference Timetable and Academic Events to compute End-of-Semester Projections
+    const [timetableSlots, academicEvents] = await Promise.all([
+      Timetable.find({ userId: user.userId, isActive: true }).select("subjectId dayOfWeek"),
+      AcademicEvent.find({ userId: user.userId }).select("date endDate type isHoliday"),
+    ]);
+
+    const semesterPredictions = calculateSemesterPredictions({
+      subjects: subjectMetrics,
+      timetableSlots: timetableSlots.map((s) => ({
+        subjectId: s.subjectId.toString(),
+        dayOfWeek: s.dayOfWeek,
+      })),
+      academicEvents: academicEvents.map((ev) => ({
+        date: ev.date,
+        endDate: ev.endDate,
+        type: ev.type,
+        isHoliday: ev.isHoliday,
+      })),
+      targetPercentage: defaultTarget,
+    });
+
     return NextResponse.json({
       success: true,
       targetPercentage: defaultTarget,
       overall: overallMetrics,
       subjects: subjectMetrics,
+      semesterPredictions,
     });
   } catch (error: any) {
     console.error("GET /api/attendance/stats error:", error);

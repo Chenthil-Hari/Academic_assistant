@@ -9,6 +9,7 @@ import {
   calculateOverallMetrics,
   calculateClassesNeeded,
   calculateMaxClassesCanMiss,
+  calculateSemesterPredictions,
 } from "@/lib/attendance/calculations";
 import mongoose from "mongoose";
 
@@ -104,6 +105,22 @@ export const AI_TOOLS_DEFINITIONS = [
       parameters: {
         type: "object",
         properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "predict_semester_attendance",
+      description: "Predict end-of-semester attendance by cross-referencing current attendance, weekly timetable slots, and remaining academic calendar days & holidays. Calculates maximum achievable percentage if student attends 100% of remaining classes, minimum percentage if 0% attended, and how many remaining classes must be attended or can safely be missed.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Optional subject code or name (e.g. 'DBMS', 'CN') to predict for a specific subject. If omitted, predicts for all subjects and overall attendance.",
+          },
+        },
       },
     },
   },
@@ -518,6 +535,90 @@ export async function executeAiTool(
       }
 
       return { schedule: scheduleByDay };
+    }
+
+    case "predict_semester_attendance": {
+      const userDoc = await User.findById(userObjectId).select("targetAttendancePercentage");
+      const defaultTarget = userDoc?.targetAttendancePercentage || 75;
+
+      const subjects = await Subject.find({ userId: userObjectId }).sort({ code: 1 });
+      const attendanceAgg = await Attendance.aggregate([
+        { $match: { userId: userObjectId } },
+        {
+          $group: {
+            _id: { subjectId: "$subjectId", status: "$status" },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const countMap: Record<string, number> = {};
+      for (const row of attendanceAgg) {
+        if (row._id?.subjectId && row._id?.status) {
+          countMap[`${row._id.subjectId.toString()}_${row._id.status}`] = row.count;
+        }
+      }
+
+      const subjectMetrics = subjects.map((sub) => {
+        const subId = sub._id.toString();
+        const attended = countMap[`${subId}_Attended`] || 0;
+        const absent = countMap[`${subId}_Absent`] || 0;
+        const cancelled = countMap[`${subId}_Cancelled`] || 0;
+        const pending = countMap[`${subId}_Pending`] || 0;
+        return calculateSubjectMetrics({
+          subjectId: subId,
+          subjectCode: sub.code,
+          subjectName: sub.name,
+          color: sub.color,
+          attended,
+          absent,
+          cancelled,
+          pending,
+          targetPercentage: sub.minAttendanceThreshold || defaultTarget,
+        });
+      });
+
+      const [timetableSlots, academicEvents] = await Promise.all([
+        Timetable.find({ userId: userObjectId, isActive: true }).select("subjectId dayOfWeek"),
+        AcademicEvent.find({ userId: userObjectId }).select("date endDate type isHoliday"),
+      ]);
+
+      const predictions = calculateSemesterPredictions({
+        subjects: subjectMetrics,
+        timetableSlots: timetableSlots.map((s) => ({
+          subjectId: s.subjectId.toString(),
+          dayOfWeek: s.dayOfWeek,
+        })),
+        academicEvents: academicEvents.map((ev) => ({
+          date: ev.date,
+          endDate: ev.endDate,
+          type: ev.type,
+          isHoliday: ev.isHoliday,
+        })),
+        targetPercentage: defaultTarget,
+      });
+
+      if (args?.subjectNameOrCode) {
+        const cleanQuery = args.subjectNameOrCode.toLowerCase().trim();
+        const matched = predictions.subjects.find(
+          (s) =>
+            s.subjectCode.toLowerCase() === cleanQuery ||
+            s.subjectName.toLowerCase().includes(cleanQuery)
+        );
+        if (matched) {
+          return {
+            searchedSubject: args.subjectNameOrCode,
+            semesterEndDate: predictions.semesterEndDate,
+            daysRemaining: predictions.daysRemaining,
+            prediction: matched,
+            summaryMessage: matched.canReachTarget
+              ? `In ${matched.subjectCode}, you currently have ${matched.currentPercentage}% (${matched.currentAttended}/${matched.currentConducted}). With ${matched.remainingClasses} class(es) remaining until semester end (${predictions.semesterEndDate}), your maximum achievable attendance is ${matched.maxAchievablePercentage}%. You must attend at least ${matched.classesNeededOfRemaining} of the remaining classes to achieve your ${matched.targetPercentage}% target (you can safely miss up to ${matched.maxCanMissOfRemaining}).`
+              : `⚠️ Warning: In ${matched.subjectCode}, even if you attend 100% of the remaining ${matched.remainingClasses} classes, your maximum attendance will only reach ${matched.maxAchievablePercentage}%, which is below your target of ${matched.targetPercentage}%.`,
+          };
+        }
+      }
+
+      return predictions;
     }
 
     case "get_uploaded_document_details": {
