@@ -1,3 +1,5 @@
+import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+
 export interface TelegramInlineKeyboardButton {
   text: string;
   url?: string;
@@ -7,6 +9,15 @@ export interface TelegramInlineKeyboardButton {
 export interface TelegramReplyMarkup {
   inline_keyboard: TelegramInlineKeyboardButton[][];
 }
+
+export const AVAILABLE_VOICES: Record<string, { id: string; name: string; flag: string }> = {
+  neerja: { id: "en-IN-NeerjaNeural", name: "Neerja (Indian Female)", flag: "🇮🇳" },
+  prabhat: { id: "en-IN-PrabhatNeural", name: "Prabhat (Indian Male)", flag: "🇮🇳" },
+  ryan: { id: "en-GB-RyanNeural", name: "Jarvis / Ryan (British Male)", flag: "🇬🇧" },
+  christopher: { id: "en-US-ChristopherNeural", name: "Christopher (US Male)", flag: "🇺🇸" },
+  jenny: { id: "en-US-JennyNeural", name: "Jenny (US Female)", flag: "🇺🇸" },
+  guy: { id: "en-US-GuyNeural", name: "Guy (US Male)", flag: "🇺🇸" },
+};
 
 const DEFAULT_BOT_TOKEN = "9007972451:AAF5VHHnHgRyNed_fmmBBreaJKVIbU5WlmA";
 
@@ -177,9 +188,12 @@ export async function sendTelegramVoice(
 }
 
 /**
- * Generates spoken voice audio (MP3 Buffer) for 100% free using Google TTS service
+ * Generates spoken voice audio (MP3 Buffer) for 100% free using Microsoft Edge Neural TTS with Google TTS fallback
  */
-export async function generateTtsAudio(text: string): Promise<Buffer | null> {
+export async function generateTtsAudio(
+  text: string,
+  voiceName: string = "en-IN-NeerjaNeural"
+): Promise<Buffer | null> {
   try {
     // Clean text of markdown formatting, emojis, and URLs
     const cleanText = text
@@ -189,7 +203,28 @@ export async function generateTtsAudio(text: string): Promise<Buffer | null> {
 
     if (!cleanText) return null;
 
-    // Split text into chunks <= 180 chars (Google TTS limit per request)
+    // Keep voice note concise (~600 chars max)
+    const truncatedText = cleanText.length > 600 ? cleanText.slice(0, 597) + "..." : cleanText;
+
+    // 1. High-Fidelity Microsoft Edge Neural TTS (Natural human voices)
+    try {
+      const tts = new MsEdgeTTS();
+      await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+      const { audioStream } = tts.toStream(truncatedText);
+      const chunks: Buffer[] = [];
+      const buffer = await new Promise<Buffer>((resolve, reject) => {
+        audioStream.on("data", (chunk: Buffer) => chunks.push(chunk));
+        audioStream.on("end", () => resolve(Buffer.concat(chunks)));
+        audioStream.on("error", (err: any) => reject(err));
+      });
+      if (buffer && buffer.length > 0) {
+        return buffer;
+      }
+    } catch (edgeErr) {
+      console.warn("Neural TTS error, trying Google TTS fallback:", edgeErr);
+    }
+
+    // 2. Google TTS Fallback
     const sentences = cleanText.match(/[^.!?]+[.!?]+|\S+/g) || [cleanText];
     const chunks: string[] = [];
     let currentChunk = "";
@@ -201,13 +236,13 @@ export async function generateTtsAudio(text: string): Promise<Buffer | null> {
         if (currentChunk) chunks.push(currentChunk);
         currentChunk = sentence.trim().slice(0, 180);
       }
-      if (chunks.length >= 4) break; // Keep voice note concise (~20-25 seconds)
+      if (chunks.length >= 4) break;
     }
     if (currentChunk && chunks.length < 4) chunks.push(currentChunk);
 
     const audioBuffers: Buffer[] = [];
     for (const chunk of chunks) {
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=en&client=tw-ob`;
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=en-in&client=tw-ob`;
       const res = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",

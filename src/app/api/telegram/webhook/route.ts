@@ -14,6 +14,7 @@ import {
   downloadTelegramFile,
   sendTelegramVoice,
   generateTtsAudio,
+  AVAILABLE_VOICES,
 } from "@/lib/notifications/telegram";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +133,43 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
+      // Handle Voice Change Selection via Inline Buttons
+      if (cq.data?.startsWith("voice_set:")) {
+        const voiceKey = cq.data.split(":")[1];
+        const voiceInfo = AVAILABLE_VOICES[voiceKey];
+        if (voiceInfo) {
+          let user = await User.findOne({ telegramChatId: chatId });
+          if (!user) user = await User.findOne({ email: "chenthilhari@gmail.com" });
+          if (user) {
+            user.assistantVoice = voiceInfo.id;
+            await user.save();
+
+            await answerTelegramCallbackQuery(cq.id, `🎙️ Voice changed to ${voiceInfo.name}!`, false);
+
+            if (messageId) {
+              await editTelegramMessage(
+                chatId,
+                messageId,
+                `✅ *Voice Changed Successfully!*\n\nYour Academic AI assistant is now using **${voiceInfo.flag} ${voiceInfo.name}**.\n\nSend a voice note anytime to listen!`
+              );
+            }
+
+            // Send brief voice note sample
+            try {
+              const sample = await generateTtsAudio(
+                `Hello ${user.name || "Hari"}! I am ${voiceInfo.name}. Your Academic AI voice notes will now be spoken in my voice!`,
+                voiceInfo.id
+              );
+              if (sample) {
+                await sendTelegramVoice(chatId, sample, `🎙️ *Voice Sample:* ${voiceInfo.name}`);
+              }
+            } catch (err) {}
+
+            return NextResponse.json({ ok: true });
+          }
+        }
+      }
+
       // Generic acknowledgement for other callback queries
       await answerTelegramCallbackQuery(cq.id);
       return NextResponse.json({ ok: true });
@@ -202,9 +240,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // Handle /voice command
+    if (text === "/voice" || text === "/voices") {
+      const currentVoice = user.assistantVoice || "en-IN-NeerjaNeural";
+      const keyboard = Object.entries(AVAILABLE_VOICES).map(([key, v]) => [
+        {
+          text: `${v.id === currentVoice ? "🟢 " : ""}${v.flag} ${v.name}`,
+          callback_data: `voice_set:${key}`,
+        },
+      ]);
+
+      await sendTelegramAlert(
+        chatId,
+        `🎙️ *Choose Your Academic AI Speaking Voice*\n\nYour current voice is: *${
+          Object.values(AVAILABLE_VOICES).find((v) => v.id === currentVoice)?.name || "Neerja (Indian Female)"
+        }*\n\nTap any voice below to switch:`,
+        { inline_keyboard: keyboard }
+      );
+      return NextResponse.json({ ok: true });
+    }
+
     // Handle /start command
     if (text === "/start") {
-      const welcomeMsg = `👋 *Welcome to Academic AI Voice & Text Assistant, ${user.name || "Hari"}!*\n\nI am your personal AI student operating system. You can ask me anything about your academic schedule by text OR by holding the 🎙️ **Voice Note** button!\n\n💡 *Try asking me by voice or text:*\n• _"What is the class now?"_\n• _"What classes do I have today?"_\n• _"How is my attendance in DBMS?"_\n• _"Can I bunk Computer Networks?"_\n• _"When is my next exam?"_\n\n👉 [Open Academic AI](https://hari07.tech)`;
+      const welcomeMsg = `👋 *Welcome to Academic AI Voice & Text Assistant, ${user.name || "Hari"}!*\n\nI am your personal AI student operating system. You can ask me anything about your academic schedule by text OR by holding the 🎙️ **Voice Note** button!\n\n🎙️ *Voice Customization:*\n• Type /voice to pick your favorite speaking voice (e.g. 🇮🇳 Neerja, 🇬🇧 Jarvis, 🇺🇸 Christopher)\n\n💡 *Try asking me by voice or text:*\n• _"What is the class now?"_\n• _"What classes do I have today?"_\n• _"How is my attendance in DBMS?"_\n• _"Can I bunk Computer Networks?"_\n• _"When is my next exam?"_\n\n👉 [Open Academic AI](https://hari07.tech)`;
       await sendTelegramAlert(chatId, welcomeMsg);
       return NextResponse.json({ ok: true });
     }
@@ -244,7 +302,8 @@ export async function POST(req: NextRequest) {
     // ─── If User Sent a Voice Note: Reply with Spoken Voice Note + Caption ───
     if (isVoiceMessage) {
       try {
-        const spokenAudioBuffer = await generateTtsAudio(replyText);
+        const userVoice = user.assistantVoice || "en-IN-NeerjaNeural";
+        const spokenAudioBuffer = await generateTtsAudio(replyText, userVoice);
         if (spokenAudioBuffer) {
           const caption = `🎙️ *Academic AI:* ${replyText}\n\n*(Transcribed: "${text}")*`;
           const sent = await sendTelegramVoice(chatId, spokenAudioBuffer, caption);
