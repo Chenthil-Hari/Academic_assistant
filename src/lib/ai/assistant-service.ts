@@ -327,34 +327,3 @@ async function runGroundedFallback(
 
   return `👋 Hi ${studentName}! I am your personal Academic AI Assistant. Ask me about your timetable today, subject attendance, bunk calculator, or upcoming exams!`;
 }
-
-/**
- * Transcribes audio bytes (e.g. Telegram voice note .oga / .mp3) using Google Gemini multimodal audio
- */
-export async function transcribeAudioBuffer(
-  audioBuffer: Buffer,
-  mimeType: string = "audio/ogg"
-): Promise<string> {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey || geminiKey === "your_gemini_api_key_here") {
-    throw new Error("GEMINI_API_KEY is not configured for audio transcription.");
-  }
-
-  const genAI = new GoogleGenerativeAI(geminiKey);
-  // Gemini 1.5/2.0 Flash handles audio natively with sub-second latency
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        data: audioBuffer.toString("base64"),
-        mimeType: mimeType || "audio/ogg",
-      },
-    },
-    {
-      text: "Transcribe this student's voice note accurately into plain text. Only return the transcribed words, without any commentary or quotation marks.",
-    },
-  ]);
-
-  return result.response.text().trim();
-}

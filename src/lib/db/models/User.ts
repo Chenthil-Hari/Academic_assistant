@@ -23,7 +23,6 @@ export interface IUser extends Document {
     };
   };
   telegramChatId?: string;
-  assistantVoice?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   createdAt: Date;
@@ -92,10 +91,6 @@ const UserSchema = new Schema<IUser>(
     telegramChatId: {
       type: String,
       default: "",
-    },
-    assistantVoice: {
-      type: String,
-      default: "en-IN-NeerjaNeural",
     },
     resetPasswordToken: {
       type: String,

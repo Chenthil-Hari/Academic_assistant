@@ -13,7 +13,6 @@ import {
   PlayCircle,
   Globe,
   Sliders,
-  Volume2,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -32,7 +31,6 @@ export default function SettingsPage() {
       timezone: "Asia/Kolkata",
     },
     telegramChatId: "",
-    assistantVoice: "en-IN-NeerjaNeural",
   });
 
   const [loading, setLoading] = useState(true);
@@ -67,7 +65,6 @@ export default function SettingsPage() {
             timezone: data.user.notificationPreferences?.timezone || "Asia/Kolkata",
           },
           telegramChatId: data.user.telegramChatId || "",
-          assistantVoice: data.user.assistantVoice || "en-IN-NeerjaNeural",
         });
       }
     } catch (err) {
@@ -433,32 +430,6 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground">
                     Message your bot or <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-primary underline">@userinfobot</a> on Telegram to get your numeric Chat ID.
                   </p>
-                </div>
-              </div>
-
-              {/* AI Voice Assistant Selection */}
-              <div className="rounded-2xl border p-4 bg-muted/20 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Volume2 className="h-4 w-4 text-primary" />
-                  <span className="font-bold text-foreground">AI Speaking Voice (Telegram & Voice Notes)</span>
-                </div>
-                <p className="text-muted-foreground text-[11px]">
-                  Choose which natural voice your AI uses when speaking back to you in voice notes.
-                </p>
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-foreground">Voice Persona</label>
-                  <select
-                    value={profile.assistantVoice}
-                    onChange={(e) => setProfile({ ...profile, assistantVoice: e.target.value })}
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
-                  >
-                    <option value="en-IN-NeerjaNeural">🇮🇳 Neerja (Indian English Female) • Recommended</option>
-                    <option value="en-IN-PrabhatNeural">🇮🇳 Prabhat (Indian English Male)</option>
-                    <option value="en-GB-RyanNeural">🇬🇧 Jarvis / Ryan (British English Male)</option>
-                    <option value="en-US-ChristopherNeural">🇺🇸 Christopher (US Deep Male)</option>
-                    <option value="en-US-JennyNeural">🇺🇸 Jenny (US Female)</option>
-                    <option value="en-US-GuyNeural">🇺🇸 Guy (US Male)</option>
-                  </select>
                 </div>
               </div>
 

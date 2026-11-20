@@ -38,7 +38,6 @@ export async function PUT(req: NextRequest) {
       targetAttendancePercentage,
       notificationPreferences,
       telegramChatId,
-      assistantVoice,
     } = body;
 
     await connectToDatabase();
@@ -63,9 +62,6 @@ export async function PUT(req: NextRequest) {
     }
     if (telegramChatId !== undefined) {
       userDoc.telegramChatId = telegramChatId.trim();
-    }
-    if (assistantVoice !== undefined) {
-      userDoc.assistantVoice = assistantVoice.trim();
     }
 
     await userDoc.save();
