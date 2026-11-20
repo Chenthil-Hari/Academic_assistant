@@ -11,11 +11,9 @@ import {
   Sparkles,
   CheckCircle,
   CalendarCheck,
-  PhoneCall,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import Link from "next/link";
-import { JarvisCallModal } from "@/components/voice/JarvisCallModal";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -27,7 +25,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showJarvisCall, setShowJarvisCall] = useState(false);
   const [user, setUser] = useState<any>(null);
   const notifRef = useRef<HTMLDivElement>(null); // BUG FIX: for outside-click close
 
@@ -118,16 +115,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
       {/* Right side: AI quick shortcut, Checkin button, notifications, theme toggle, user */}
       <div className="flex items-center gap-2 md:gap-3">
-        {/* LiveKit Jarvis Voice Call Button */}
-        <button
-          onClick={() => setShowJarvisCall(true)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-blue-500/25 transition-all hover:scale-105"
-          title="Start LiveKit Voice Call with Jarvis"
-        >
-          <PhoneCall className="h-3.5 w-3.5 animate-pulse" />
-          <span>Jarvis Call</span>
-        </button>
-
         {/* Quick AI button */}
         <Link
           href="/ai-assistant"
@@ -225,13 +212,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </button>
         </div>
       </div>
-
-      {/* LiveKit Jarvis Voice Call Modal */}
-      <JarvisCallModal
-        isOpen={showJarvisCall}
-        onClose={() => setShowJarvisCall(false)}
-        userName={user?.name || "Hari"}
-      />
     </header>
   );
 }

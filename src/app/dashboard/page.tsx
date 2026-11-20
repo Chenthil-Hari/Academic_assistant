@@ -20,10 +20,8 @@ import {
   ArrowRight,
   CalendarCheck,
   Target,
-  PhoneCall,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
-import { JarvisCallModal } from "@/components/voice/JarvisCallModal";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -33,7 +31,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [checkinMessage, setCheckinMessage] = useState("");
-  const [showJarvisCall, setShowJarvisCall] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -132,14 +129,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowJarvisCall(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700 transition-all hover:scale-105"
-            >
-              <PhoneCall className="h-4 w-4 animate-pulse" />
-              <span>Call Jarvis</span>
-            </button>
-
             <Link
               href="/upload"
               className="inline-flex items-center gap-2 rounded-xl border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
@@ -749,12 +738,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      <JarvisCallModal
-        isOpen={showJarvisCall}
-        onClose={() => setShowJarvisCall(false)}
-        userName={user?.name || "Hari"}
-      />
     </AppLayout>
   );
 }
