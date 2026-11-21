@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Download, Share, X, CheckCircle, Smartphone } from "lucide-react";
+import { Download, Share, X, MoreVertical, Smartphone, CheckCircle2 } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -20,9 +20,10 @@ export function PWAInstallPrompt({
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [installed, setInstalled] = useState(false);
-  const [showIOSModal, setShowIOSModal] = useState(false);
+  const [showHelperModal, setShowHelperModal] = useState(false);
 
   useEffect(() => {
     // Check if already running in standalone PWA mode
@@ -32,15 +33,15 @@ export function PWAInstallPrompt({
 
     setIsStandalone(isStandaloneMode);
 
-    // Check if user previously dismissed banner in this session
     if (sessionStorage.getItem("pwa_prompt_dismissed") === "true") {
       setDismissed(true);
     }
 
-    // Detect iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const isAppleDevice = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(isAppleDevice);
+    const isApple = /iphone|ipad|ipod/.test(userAgent);
+    const isAndroidDevice = /android/.test(userAgent);
+    setIsIOS(isApple);
+    setIsAndroid(isAndroidDevice);
 
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -62,29 +63,23 @@ export function PWAInstallPrompt({
   }, []);
 
   const handleInstallClick = async () => {
-    if (isIOS) {
-      setShowIOSModal(true);
-      return;
-    }
-
-    if (!deferredPrompt) {
-      // Fallback instruction if not directly triggerable
-      alert(
-        "To install Academic AI:\n• On Chrome/Edge: Click the install icon (⊕ or ⬇) in your address bar.\n• On Mobile: Tap the 3 dots menu and select 'Install app' or 'Add to Home screen'."
-      );
-      return;
-    }
-
-    try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === "accepted") {
-        setInstalled(true);
+    // If native prompt is captured by browser
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === "accepted") {
+          setInstalled(true);
+        }
+        setDeferredPrompt(null);
+        return;
+      } catch (err) {
+        console.error("PWA install error:", err);
       }
-      setDeferredPrompt(null);
-    } catch (err) {
-      console.error("PWA install error:", err);
     }
+
+    // If native prompt wasn't triggered yet or on specific mobile browser, show device-specific guide
+    setShowHelperModal(true);
   };
 
   const handleDismiss = () => {
@@ -92,7 +87,6 @@ export function PWAInstallPrompt({
     sessionStorage.setItem("pwa_prompt_dismissed", "true");
   };
 
-  // If already running as installed PWA or already completed, don't show prompt banner
   if (isStandalone || installed) {
     return null;
   }
@@ -103,15 +97,19 @@ export function PWAInstallPrompt({
         <button
           onClick={handleInstallClick}
           className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 shadow-sm transition-all"
-          title="Install as native app on desktop or mobile"
+          title="Install as native app on Android, desktop, or iOS"
         >
           <Smartphone className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Install App</span>
           <span className="sm:hidden">Install</span>
         </button>
 
-        {showIOSModal && (
-          <IOSInstallModal onClose={() => setShowIOSModal(false)} />
+        {showHelperModal && (
+          <DeviceInstallModal
+            isAndroid={isAndroid}
+            isIOS={isIOS}
+            onClose={() => setShowHelperModal(false)}
+          />
         )}
       </>
     );
@@ -130,14 +128,14 @@ export function PWAInstallPrompt({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-sm font-bold text-foreground">
-                  Install Academic AI App
+                  Install Academic AI on Android
                 </h4>
-                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-400">
-                  PWA Ready
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                  Android APK Ready
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Install for instant offline access, daily 8 AM audio briefings, and push notifications directly on your device.
+                Install to your Android home screen and app drawer for fast offline access and 8:00 AM audio briefings.
               </p>
             </div>
           </div>
@@ -161,21 +159,39 @@ export function PWAInstallPrompt({
         </div>
       </div>
 
-      {showIOSModal && (
-        <IOSInstallModal onClose={() => setShowIOSModal(false)} />
+      {showHelperModal && (
+        <DeviceInstallModal
+          isAndroid={isAndroid}
+          isIOS={isIOS}
+          onClose={() => setShowHelperModal(false)}
+        />
       )}
     </>
   );
 }
 
-function IOSInstallModal({ onClose }: { onClose: () => void }) {
+function DeviceInstallModal({
+  isAndroid,
+  isIOS,
+  onClose,
+}: {
+  isAndroid: boolean;
+  isIOS: boolean;
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pb-2 border-b">
           <div className="flex items-center gap-2 font-bold text-foreground">
             <Smartphone className="h-5 w-5 text-primary" />
-            <span>Install on iOS Safari</span>
+            <span>
+              {isAndroid
+                ? "Install on Android (Chrome)"
+                : isIOS
+                ? "Install on iOS (Safari)"
+                : "Install Academic AI"}
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -185,32 +201,82 @@ function IOSInstallModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <ol className="space-y-3 text-xs text-muted-foreground leading-relaxed">
-          <li className="flex items-center gap-2.5">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
-              1
-            </span>
-            <span>
-              Tap the <strong>Share</strong> button <Share className="inline h-3.5 w-3.5 mx-0.5" /> at the bottom of Safari.
-            </span>
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
-              2
-            </span>
-            <span>
-              Scroll down and tap <strong>Add to Home Screen</strong>.
-            </span>
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
-              3
-            </span>
-            <span>
-              Tap <strong>Add</strong> in the top right to launch Academic AI as a standalone app!
-            </span>
-          </li>
-        </ol>
+        {isAndroid ? (
+          <ol className="space-y-3 text-xs text-muted-foreground leading-relaxed">
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                1
+              </span>
+              <span>
+                In Google Chrome, tap the <strong>three dots</strong> (
+                <MoreVertical className="inline h-3.5 w-3.5 mx-0.5 text-foreground" />
+                ) in the top-right corner.
+              </span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                2
+              </span>
+              <span>
+                Tap <strong>&ldquo;Install app&rdquo;</strong> (or <strong>&ldquo;Add to Home screen&rdquo;</strong>).
+              </span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                3
+              </span>
+              <span>
+                Tap <strong>Install</strong> when prompted. Chrome will create a standalone app with its own icon in your Android app drawer!
+              </span>
+            </li>
+          </ol>
+        ) : isIOS ? (
+          <ol className="space-y-3 text-xs text-muted-foreground leading-relaxed">
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                1
+              </span>
+              <span>
+                Tap the <strong>Share</strong> button <Share className="inline h-3.5 w-3.5 mx-0.5" /> at the bottom of Safari.
+              </span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                2
+              </span>
+              <span>
+                Scroll down and tap <strong>Add to Home Screen</strong>.
+              </span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                3
+              </span>
+              <span>
+                Tap <strong>Add</strong> in the top right.
+              </span>
+            </li>
+          </ol>
+        ) : (
+          <ol className="space-y-3 text-xs text-muted-foreground leading-relaxed">
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                1
+              </span>
+              <span>
+                Click the <strong>Install</strong> icon (⊕ or ⬇) in your Chrome/Edge browser address bar.
+              </span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                2
+              </span>
+              <span>
+                Confirm <strong>Install</strong> to add Academic AI as a native desktop application.
+              </span>
+            </li>
+          </ol>
+        )}
 
         <button
           onClick={onClose}
