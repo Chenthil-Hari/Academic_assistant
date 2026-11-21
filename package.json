@@ -11,6 +11,7 @@
     "test:db": "npx tsx scripts/test-db-connection.ts"
   },
   "dependencies": {
+    "@andresaya/edge-tts": "^1.9.1",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",

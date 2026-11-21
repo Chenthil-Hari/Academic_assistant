@@ -11,8 +11,9 @@ import {
   Calendar,
   AlertTriangle,
   Clock,
-  CheckCircle2,
-  BellRing,
+  Mic,
+  Loader2,
+  Headphones,
 } from "lucide-react";
 
 interface MorningBriefingData {
@@ -39,30 +40,36 @@ interface MorningBriefingData {
     eventType: string;
     startDate: string;
   }>;
-  isHoliday?: boolean;
-  holidayTitle?: string;
-  targetPercentage?: number;
 }
+
+const VOICES = [
+  { id: "christopher", label: "Christopher (Natural Male)" },
+  { id: "jenny", label: "Jenny (Warm Female)" },
+  { id: "prabhat", label: "Prabhat (Indian Accent Male)" },
+  { id: "neerja", label: "Neerja (Indian Accent Female)" },
+  { id: "aria", label: "Aria (News Anchor)" },
+];
 
 export function MorningBriefingCard() {
   const [data, setData] = useState<MorningBriefingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [audioLoading, setAudioLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [speechRate, setSpeechRate] = useState<number>(1.0);
-  const [isSupported, setIsSupported] = useState(true);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState("christopher");
+  const [playbackRate, setPlaybackRate] = useState<number>(1.0);
+  const [audioProgress, setAudioProgress] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     fetchBriefing();
 
-    if (typeof window !== "undefined" && !("speechSynthesis" in window)) {
-      setIsSupported(false);
-    }
-
     return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
       }
     };
   }, []);
@@ -82,80 +89,118 @@ export function MorningBriefingCard() {
     }
   };
 
-  const handlePlayVoice = () => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      alert("Speech synthesis is not supported on this device/browser.");
-      return;
-    }
-
-    if (isPaused) {
-      window.speechSynthesis.resume();
-      setIsPaused(false);
+  const handlePlayRealVoice = async () => {
+    // If paused, just resume
+    if (audioRef.current && isPaused) {
+      audioRef.current.play();
       setIsPlaying(true);
+      setIsPaused(false);
       return;
     }
 
-    if (isPlaying) {
-      window.speechSynthesis.pause();
+    // If playing, pause
+    if (audioRef.current && isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
       setIsPaused(true);
-      setIsPlaying(false);
       return;
     }
 
-    window.speechSynthesis.cancel();
+    // Create or load audio
+    setAudioLoading(true);
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
 
-    const textToSpeak =
-      data?.briefingText ||
-      "Good morning! Your academic schedule and attendance are up to date.";
+      const audioUrl = `/api/briefing/audio?voice=${selectedVoice}&t=${Date.now()}`;
+      const audio = new Audio(audioUrl);
+      audio.playbackRate = playbackRate;
 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.rate = speechRate;
-    utterance.pitch = 1.0;
+      audio.onloadedmetadata = () => {
+        setDuration(audio.duration || 0);
+      };
 
-    // Pick a natural English voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(
-      (v) =>
-        (v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha") || v.name.includes("Daniel"))) ||
-        v.lang === "en-US" ||
-        v.lang === "en-GB" ||
-        v.lang === "en-IN"
-    );
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+      audio.onplay = () => {
+        setIsPlaying(true);
+        setIsPaused(false);
+        setAudioLoading(false);
+      };
+
+      audio.onpause = () => {
+        setIsPlaying(false);
+        setIsPaused(true);
+      };
+
+      audio.onended = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+        setAudioProgress(0);
+      };
+
+      audio.ontimeupdate = () => {
+        if (audio.duration) {
+          setAudioProgress((audio.currentTime / audio.duration) * 100);
+        }
+      };
+
+      audio.onerror = () => {
+        console.warn("Real voice audio stream failed, falling back to Web Speech synthesis");
+        setAudioLoading(false);
+        fallbackWebSpeech();
+      };
+
+      audioRef.current = audio;
+      await audio.play();
+    } catch (err) {
+      console.warn("Audio playback error:", err);
+      setAudioLoading(false);
+      fallbackWebSpeech();
     }
+  };
 
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setIsPaused(false);
-    };
-
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
-
-    utterance.onerror = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
-
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+  const fallbackWebSpeech = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const textToSpeak = data?.briefingText || "Good morning! Your academic updates are ready.";
+      const u = new SpeechSynthesisUtterance(textToSpeak);
+      u.rate = playbackRate;
+      u.onstart = () => {
+        setIsPlaying(true);
+        setIsPaused(false);
+      };
+      u.onend = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+      window.speechSynthesis.speak(u);
+    }
   };
 
   const handleStopVoice = () => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       setIsPlaying(false);
       setIsPaused(false);
+      setAudioProgress(0);
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const handleVoiceChange = (newVoice: string) => {
+    setSelectedVoice(newVoice);
+    if (isPlaying || isPaused) {
+      handleStopVoice();
     }
   };
 
   const handleRateChange = (newRate: number) => {
-    setSpeechRate(newRate);
-    if (isPlaying) {
-      handleStopVoice();
+    setPlaybackRate(newRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = newRate;
     }
   };
 
@@ -175,26 +220,41 @@ export function MorningBriefingCard() {
               <h3 className="text-base font-bold text-foreground">
                 8:00 AM Daily Briefing
               </h3>
-              <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-500 border border-blue-500/20">
-                Voice Audio Ready
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
+                <Headphones className="h-2.5 w-2.5" />
+                <span>Real Human Voice</span>
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Personalized morning audio dispatch with schedule, safe-zone criteria & deadlines
+              Natural neural voice briefing with today&apos;s timetable, attendance criteria & deadlines
             </p>
           </div>
         </div>
 
         {/* Audio controls */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Voice Selector Dropdown */}
+          <select
+            value={selectedVoice}
+            onChange={(e) => handleVoiceChange(e.target.value)}
+            className="rounded-xl border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+            title="Select natural neural voice"
+          >
+            {VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+
           {/* Speed selector */}
           <div className="flex items-center rounded-xl bg-muted/60 p-0.5 text-[11px] font-semibold">
-            {[0.9, 1.0, 1.2].map((rate) => (
+            {[0.9, 1.0, 1.25].map((rate) => (
               <button
                 key={rate}
                 onClick={() => handleRateChange(rate)}
                 className={`px-2 py-1 rounded-lg transition-colors ${
-                  speechRate === rate
+                  playbackRate === rate
                     ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -206,15 +266,20 @@ export function MorningBriefingCard() {
 
           {/* Voice Play/Pause button */}
           <button
-            onClick={handlePlayVoice}
-            disabled={loading}
+            onClick={handlePlayRealVoice}
+            disabled={loading || audioLoading}
             className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all ${
               isPlaying
                 ? "bg-amber-500 text-white shadow-amber-500/25 hover:bg-amber-600 animate-pulse"
                 : "bg-primary text-primary-foreground shadow-primary/25 hover:bg-primary/90"
             }`}
           >
-            {isPlaying ? (
+            {audioLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Loading Voice...</span>
+              </>
+            ) : isPlaying ? (
               <>
                 <Pause className="h-3.5 w-3.5" />
                 <span>Pause</span>
@@ -227,7 +292,7 @@ export function MorningBriefingCard() {
             ) : (
               <>
                 <Volume2 className="h-3.5 w-3.5" />
-                <span>Listen Audio</span>
+                <span>Listen Briefing</span>
               </>
             )}
           </button>
@@ -244,16 +309,33 @@ export function MorningBriefingCard() {
         </div>
       </div>
 
-      {/* Dynamic Visualizer Bar when playing */}
+      {/* Dynamic Soundwave Visualizer Bar when playing */}
       {isPlaying && (
-        <div className="my-3 flex items-center justify-center gap-1 py-1 px-4 rounded-xl bg-primary/10 border border-primary/20">
-          <span className="text-[11px] font-semibold text-primary mr-2">Speaking:</span>
-          <span className="h-3 w-1 bg-primary rounded-full animate-bounce [animation-delay:0ms]" />
-          <span className="h-5 w-1 bg-primary rounded-full animate-bounce [animation-delay:150ms]" />
-          <span className="h-2 w-1 bg-primary rounded-full animate-bounce [animation-delay:300ms]" />
-          <span className="h-4 w-1 bg-primary rounded-full animate-bounce [animation-delay:75ms]" />
-          <span className="h-6 w-1 bg-primary rounded-full animate-bounce [animation-delay:225ms]" />
-          <span className="h-3 w-1 bg-primary rounded-full animate-bounce [animation-delay:120ms]" />
+        <div className="my-3 space-y-1.5">
+          <div className="flex items-center justify-between px-1 text-[10px] text-muted-foreground font-medium">
+            <span className="flex items-center gap-1.5 text-primary font-bold">
+              <Mic className="h-3 w-3 animate-pulse" />
+              Speaking via Neural Voice ({VOICES.find(v => v.id === selectedVoice)?.label})
+            </span>
+            <span>Real human voice generated via Neural TTS</span>
+          </div>
+          <div className="flex items-center justify-center gap-1 py-1.5 px-4 rounded-xl bg-primary/10 border border-primary/20">
+            <span className="h-3 w-1 bg-primary rounded-full animate-bounce [animation-delay:0ms]" />
+            <span className="h-6 w-1 bg-primary rounded-full animate-bounce [animation-delay:150ms]" />
+            <span className="h-2 w-1 bg-primary rounded-full animate-bounce [animation-delay:300ms]" />
+            <span className="h-5 w-1 bg-primary rounded-full animate-bounce [animation-delay:75ms]" />
+            <span className="h-7 w-1 bg-primary rounded-full animate-bounce [animation-delay:225ms]" />
+            <span className="h-4 w-1 bg-primary rounded-full animate-bounce [animation-delay:120ms]" />
+            <span className="h-6 w-1 bg-primary rounded-full animate-bounce [animation-delay:180ms]" />
+            <span className="h-3 w-1 bg-primary rounded-full animate-bounce [animation-delay:90ms]" />
+          </div>
+          {/* Progress bar */}
+          <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-200"
+              style={{ width: `${audioProgress}%` }}
+            />
+          </div>
         </div>
       )}
 
