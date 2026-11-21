@@ -24,8 +24,11 @@ import {
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
+import { ElectricBorder } from "@/components/ui/ElectricBorder";
+import { useTheme } from "@/components/layout/ThemeProvider";
 
 export default function DashboardPage() {
+  const { actualTheme } = useTheme();
   const [stats, setStats] = useState<any>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
@@ -430,44 +433,57 @@ export default function DashboardPage() {
             </div>
 
             {/* Quick AI Assistant Card */}
-            <div className="rounded-3xl border bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-blue-500/15 p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-sm text-foreground">AI Assistant Ready</h3>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Ask questions about your classes, bunk safety calculator, or academic schedule directly.
-              </p>
+            <ElectricBorder
+              color="#7df9ff"
+              glowColor="#6366f1"
+              speed={0.9}
+              chaos={0.35}
+              spread={0.5}
+              strands={3}
+              thickness={1.3}
+              borderRadius={24}
+              theme={actualTheme === "light" ? "light" : "dark"}
+              className="w-full"
+            >
+              <div className="rounded-3xl border bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-blue-500/15 p-6 shadow-sm space-y-4 w-full">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h3 className="font-bold text-sm text-foreground">AI Assistant Ready</h3>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Ask questions about your classes, bunk safety calculator, or academic schedule directly.
+                </p>
 
-              <div className="space-y-2">
+                <div className="space-y-2">
+                  <Link
+                    href="/ai-assistant?q=What classes do I have today?"
+                    className="block rounded-xl bg-card/80 p-2.5 text-xs font-medium text-foreground hover:bg-card transition-colors shadow-sm"
+                  >
+                    &quot;What classes do I have today?&quot; →
+                  </Link>
+                  <Link
+                    href="/ai-assistant?q=How many classes can I miss?"
+                    className="block rounded-xl bg-card/80 p-2.5 text-xs font-medium text-foreground hover:bg-card transition-colors shadow-sm"
+                  >
+                    &quot;How many classes can I miss?&quot; →
+                  </Link>
+                  <Link
+                    href="/ai-assistant?q=Which subject has the lowest attendance?"
+                    className="block rounded-xl bg-card/80 p-2.5 text-xs font-medium text-foreground hover:bg-card transition-colors shadow-sm"
+                  >
+                    &quot;Which subject has the lowest attendance?&quot; →
+                  </Link>
+                </div>
+
                 <Link
-                  href="/ai-assistant?q=What classes do I have today?"
-                  className="block rounded-xl bg-card/80 p-2.5 text-xs font-medium text-foreground hover:bg-card transition-colors shadow-sm"
+                  href="/ai-assistant"
+                  className="flex items-center justify-center gap-2 w-full rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
                 >
-                  "What classes do I have today?" →
-                </Link>
-                <Link
-                  href="/ai-assistant?q=How many classes can I miss?"
-                  className="block rounded-xl bg-card/80 p-2.5 text-xs font-medium text-foreground hover:bg-card transition-colors shadow-sm"
-                >
-                  "How many classes can I miss?" →
-                </Link>
-                <Link
-                  href="/ai-assistant?q=Which subject has the lowest attendance?"
-                  className="block rounded-xl bg-card/80 p-2.5 text-xs font-medium text-foreground hover:bg-card transition-colors shadow-sm"
-                >
-                  "Which subject has the lowest attendance?" →
+                  <span>Open Full Chat Assistant</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
-
-              <Link
-                href="/ai-assistant"
-                className="flex items-center justify-center gap-2 w-full rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
-              >
-                <span>Open Full Chat Assistant</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+            </ElectricBorder>
           </div>
         </div>
       </div>

@@ -20,8 +20,11 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { ElectricBorder } from "@/components/ui/ElectricBorder";
+import { useTheme } from "@/components/layout/ThemeProvider";
 
 export default function AttendancePage() {
+  const { actualTheme } = useTheme();
   const [stats, setStats] = useState<any>(null);
   const [records, setRecords] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -588,48 +591,60 @@ export default function AttendancePage() {
                 </div>
 
                 {/* Interactive What-If Simulator */}
-                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-                  <div className="font-bold text-foreground text-sm">🧮 What-If Simulator</div>
-                  <p className="text-muted-foreground text-[11px]">Simulate future classes to predict your attendance %.</p>
-                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-semibold text-foreground">Future classes conducted</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={200}
-                        value={simFutureConducted}
-                        onChange={(e) => setSimFutureConducted(Math.max(0, Number(e.target.value)))}
-                        className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-semibold text-foreground">Of which you attend</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={simFutureConducted}
-                        value={simFutureAttended}
-                        onChange={(e) => setSimFutureAttended(Math.min(simFutureConducted, Math.max(0, Number(e.target.value))))}
-                        className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  {simFutureConducted > 0 && (() => {
-                    const newAttended = (overall?.totalAttended || 0) + simFutureAttended;
-                    const newConducted = (overall?.totalConducted || 0) + simFutureConducted;
-                    const newPct = newConducted === 0 ? 100 : Number(((newAttended / newConducted) * 100).toFixed(1));
-                    const isAbove = newPct >= targetPct;
-                    return (
-                      <div className={`rounded-xl p-3 ${isAbove ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
-                        <div className="font-bold">Projected attendance: {newPct}%</div>
-                        <div className="text-[11px] mt-0.5 text-muted-foreground">
-                          {isAbove ? `✅ You'll be ${(newPct - targetPct).toFixed(1)}% above target.` : `❌ You'll be ${(targetPct - newPct).toFixed(1)}% below target.`}
-                        </div>
+                <ElectricBorder
+                  color="#60a5fa"
+                  glowColor="#3b82f6"
+                  speed={0.9}
+                  chaos={0.3}
+                  spread={0.4}
+                  thickness={1.2}
+                  borderRadius={16}
+                  theme={actualTheme === "light" ? "light" : "dark"}
+                  className="w-full"
+                >
+                  <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3 w-full">
+                    <div className="font-bold text-foreground text-sm">🧮 What-If Simulator</div>
+                    <p className="text-muted-foreground text-[11px]">Simulate future classes to predict your attendance %.</p>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-foreground">Future classes conducted</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={200}
+                          value={simFutureConducted}
+                          onChange={(e) => setSimFutureConducted(Math.max(0, Number(e.target.value)))}
+                          className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                        />
                       </div>
-                    );
-                  })()}
-                </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-foreground">Of which you attend</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={simFutureConducted}
+                          value={simFutureAttended}
+                          onChange={(e) => setSimFutureAttended(Math.min(simFutureConducted, Math.max(0, Number(e.target.value))))}
+                          className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    {simFutureConducted > 0 && (() => {
+                      const newAttended = (overall?.totalAttended || 0) + simFutureAttended;
+                      const newConducted = (overall?.totalConducted || 0) + simFutureConducted;
+                      const newPct = newConducted === 0 ? 100 : Number(((newAttended / newConducted) * 100).toFixed(1));
+                      const isAbove = newPct >= targetPct;
+                      return (
+                        <div className={`rounded-xl p-3 ${isAbove ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
+                          <div className="font-bold">Projected attendance: {newPct}%</div>
+                          <div className="text-[11px] mt-0.5 text-muted-foreground">
+                            {isAbove ? `✅ You'll be ${(newPct - targetPct).toFixed(1)}% above target.` : `❌ You'll be ${(targetPct - newPct).toFixed(1)}% below target.`}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </ElectricBorder>
               </div>
 
               <button

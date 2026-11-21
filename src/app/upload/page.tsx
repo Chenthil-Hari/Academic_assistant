@@ -18,8 +18,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ElectricBorder } from "@/components/ui/ElectricBorder";
+import { useTheme } from "@/components/layout/ThemeProvider";
 
 export default function UploadPage() {
+  const { actualTheme } = useTheme();
   const router = useRouter();
   const [docType, setDocType] = useState<"timetable_pdf" | "academic_calendar_pdf">("timetable_pdf");
   const [file, setFile] = useState<File | null>(null);
@@ -281,23 +284,36 @@ export default function UploadPage() {
                   Step 2: Choose PDF File
                 </label>
 
-                <div className="relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border p-10 text-center hover:bg-muted/20 transition-colors">
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3">
-                    <UploadCloud className="h-7 w-7" />
+                <ElectricBorder
+                  color={file ? "#10b981" : "#7df9ff"}
+                  glowColor={file ? "#059669" : "#3b82f6"}
+                  speed={uploading ? 2 : file ? 1.2 : 0.8}
+                  chaos={uploading ? 0.6 : 0.35}
+                  spread={uploading ? 0.8 : 0.5}
+                  strands={uploading ? 4 : 3}
+                  thickness={uploading ? 1.8 : 1.3}
+                  borderRadius={24}
+                  theme={actualTheme === "light" ? "light" : "dark"}
+                  className="w-full"
+                >
+                  <div className="relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border/80 bg-card/60 backdrop-blur-xs p-10 text-center hover:bg-muted/20 transition-colors w-full">
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3">
+                      <UploadCloud className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {file ? file.name : "Click or drag & drop PDF here"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supports native PDF text and scanned document images via OCR (up to 10MB)
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {file ? file.name : "Click or drag & drop PDF here"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Supports native PDF text and scanned document images via OCR (up to 10MB)
-                  </p>
-                </div>
+                </ElectricBorder>
               </div>
 
               <div className="flex justify-end pt-2">
