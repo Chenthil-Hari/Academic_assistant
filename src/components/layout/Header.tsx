@@ -15,6 +15,7 @@ import {
 import { useTheme } from "./ThemeProvider";
 import Link from "next/link";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
+import { ThemeSwitch } from "./ThemeSwitch";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -192,14 +193,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           )}
         </div>
 
-        {/* Theme Toggle */}
-        <button
-          onClick={() => setTheme(actualTheme === "dark" ? "light" : "dark")}
-          className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          aria-label="Toggle Theme"
-        >
-          {actualTheme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-blue-500" />}
-        </button>
+        {/* Day / Night Animated Theme Switch */}
+        <ThemeSwitch />
 
         {/* User initials & Logout */}
         <div className="flex items-center gap-2 pl-2 border-l">
