@@ -33,11 +33,6 @@
       "name": "Timetable",
       "url": "/timetable",
       "description": "View weekly timetable and room numbers"
-    },
-    {
-      "name": "Mess Menu",
-      "url": "/mess-menu",
-      "description": "View hostel cafeteria and mess schedule"
     }
   ]
 }

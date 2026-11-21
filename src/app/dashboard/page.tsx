@@ -25,7 +25,6 @@ import {
 import { formatTime } from "@/lib/utils";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { MorningBriefingCard } from "@/components/dashboard/MorningBriefingCard";
-import { MessMenuWidget } from "@/components/dashboard/MessMenuWidget";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -475,9 +474,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-
-        {/* Hostel Mess & Cafeteria Schedule */}
-        <MessMenuWidget />
       </div>
     </AppLayout>
   );

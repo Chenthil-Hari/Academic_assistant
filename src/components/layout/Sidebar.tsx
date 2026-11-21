@@ -13,7 +13,6 @@ import {
   UploadCloud,
   Settings,
   GraduationCap,
-  Utensils,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,7 +27,6 @@ const NAV_ITEMS = [
   { name: "Attendance", href: "/attendance", icon: CheckCircle2 },
   { name: "Timetable", href: "/timetable", icon: CalendarDays },
   { name: "Calendar", href: "/calendar", icon: Calendar },
-  { name: "Mess Menu", href: "/mess-menu", icon: Utensils },
   { name: "AI Assistant", href: "/ai-assistant", icon: Sparkles, badge: "AI" },
   { name: "PDF Upload", href: "/upload", icon: UploadCloud },
   { name: "Reports", href: "/reports", icon: BarChart3 },
