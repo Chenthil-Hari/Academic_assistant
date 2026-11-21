@@ -1,5 +1,85 @@
-// Service Worker for Academic AI (Web Push & Notification Handling)
+// Service Worker for Academic AI (PWA Offline Caching + Web Push & Notification Handling)
 
+const CACHE_NAME = "academic-ai-v1";
+const STATIC_ASSETS = [
+  "/",
+  "/dashboard",
+  "/attendance",
+  "/timetable",
+  "/calendar",
+  "/manifest.json",
+  "/icon.svg"
+];
+
+// Install Event - Pre-cache essential static assets
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn("Service Worker pre-caching non-fatal warning:", err);
+      });
+    })
+  );
+  self.skipWaiting();
+});
+
+// Activate Event - Clean up stale caches
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// Fetch Event - Stale-while-revalidate for static assets, network-first for API
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+
+  // Skip non-GET requests or chrome-extension URLs
+  if (event.request.method !== "GET" || !url.protocol.startsWith("http")) {
+    return;
+  }
+
+  // Network-first for API routes
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return new Response(JSON.stringify({ error: "Offline mode active" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" }
+        });
+      })
+    );
+    return;
+  }
+
+  // Cache-first / Stale-while-revalidate for static files & page navigation
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
+    })
+  );
+});
+
+// Push Notifications Handling
 self.addEventListener("push", function (event) {
   if (event.data) {
     try {
@@ -8,11 +88,11 @@ self.addEventListener("push", function (event) {
         body: data.body || "You have academic updates waiting.",
         icon: data.icon || "/icon.svg",
         badge: data.badge || "/icon.svg",
-        data: data.data || { url: "/attendance" },
+        data: data.data || { url: "/dashboard" },
         vibrate: [100, 50, 100],
         actions: [
-          { action: "checkin", title: "Mark Attendance" },
-          { action: "dismiss", title: "Later" },
+          { action: "open", title: "Open App" },
+          { action: "dismiss", title: "Dismiss" },
         ],
       };
 
@@ -29,9 +109,10 @@ self.addEventListener("push", function (event) {
   }
 });
 
+// Notification Click Handling
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || "/attendance";
+  const urlToOpen = event.notification.data?.url || "/dashboard";
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {

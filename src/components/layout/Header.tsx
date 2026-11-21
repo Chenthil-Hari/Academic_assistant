@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import Link from "next/link";
+import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -115,6 +116,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
       {/* Right side: AI quick shortcut, Checkin button, notifications, theme toggle, user */}
       <div className="flex items-center gap-2 md:gap-3">
+        {/* PWA Install Button */}
+        <PWAInstallPrompt variant="button" />
+
         {/* Quick AI button */}
         <Link
           href="/ai-assistant"

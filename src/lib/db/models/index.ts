@@ -8,3 +8,4 @@ export * from "./UploadedDocument";
 export * from "./Conversation";
 export * from "./Notification";
 export * from "./AuditLog";
+export * from "./MessMenu";
