@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/morning-briefing",
-      "schedule": "30 2 * * *"
-    },
-    {
       "path": "/api/cron/daily-checkin",
       "schedule": "30 10 * * *"
     }

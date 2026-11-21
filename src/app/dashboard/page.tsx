@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
-import { MorningBriefingCard } from "@/components/dashboard/MorningBriefingCard";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -106,9 +105,6 @@ export default function DashboardPage() {
 
         {/* PWA Install Banner */}
         <PWAInstallPrompt variant="banner" />
-
-        {/* 8:00 AM Daily Morning Briefing Card (with Web Speech Audio) */}
-        <MorningBriefingCard />
 
         {/* Top Metrics Cards Grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

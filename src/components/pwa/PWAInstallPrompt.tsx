@@ -135,7 +135,7 @@ export function PWAInstallPrompt({
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Install to your Android home screen and app drawer for fast offline access and 8:00 AM audio briefings.
+                Install to your Android home screen and app drawer for fast offline access and real-time attendance calculations.
               </p>
             </div>
           </div>

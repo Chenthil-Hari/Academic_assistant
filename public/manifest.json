@@ -22,7 +22,7 @@
     {
       "name": "Dashboard",
       "url": "/dashboard",
-      "description": "View overall attendance, today's schedule, and morning briefing"
+      "description": "View overall attendance and today's schedule"
     },
     {
       "name": "Attendance",
