@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef, Suspense } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSearchParams } from "next/navigation";
+import { useTheme } from "@/components/layout/ThemeProvider";
+import { ElectricBorder } from "@/components/ui/ElectricBorder";
 import {
   Sparkles,
   Send,
@@ -35,6 +37,7 @@ const QUICK_PROMPTS = [
 ];
 
 function AssistantChat() {
+  const { actualTheme } = useTheme();
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
 
@@ -387,22 +390,35 @@ function AssistantChat() {
 
         {/* Chat Input */}
         <form onSubmit={handleSubmit} className="p-3 sm:p-4 border-t bg-card/90">
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Ask Academic AI about your schedule, attendance, or bunk buffer..."
-              className="w-full rounded-2xl border bg-background py-2.5 sm:py-3 pl-3 sm:pl-4 pr-11 text-xs sm:text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <button
-              type="submit"
-              disabled={loading || !inputMessage.trim()}
-              className="absolute right-1.5 sm:right-2 rounded-xl bg-primary p-2 text-primary-foreground shadow-sm hover:bg-primary/90 transition-all disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
+          <ElectricBorder
+            color="#7df9ff"
+            glowColor="#3b82f6"
+            speed={loading ? 1.6 : 1}
+            chaos={0.4}
+            spread={0.5}
+            strands={3}
+            thickness={1.4}
+            borderRadius={16}
+            theme={actualTheme === "light" ? "light" : "dark"}
+            className="w-full"
+          >
+            <div className="relative flex items-center w-full">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder="Ask Academic AI about your schedule, attendance, or bunk buffer..."
+                className="w-full rounded-2xl border border-border/80 bg-background/90 py-2.5 sm:py-3 pl-3 sm:pl-4 pr-11 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              <button
+                type="submit"
+                disabled={loading || !inputMessage.trim()}
+                className="absolute right-1.5 sm:right-2 rounded-xl bg-primary p-2 text-primary-foreground shadow-sm hover:bg-primary/90 transition-all disabled:opacity-40 z-10"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </ElectricBorder>
         </form>
       </div>
     </div>
