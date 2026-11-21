@@ -96,12 +96,12 @@ export function PWAInstallPrompt({
       <>
         <button
           onClick={handleInstallClick}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 shadow-sm transition-all"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-2 sm:px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 shadow-sm transition-all shrink-0"
           title="Install as native app on Android, desktop, or iOS"
         >
           <Smartphone className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Install App</span>
-          <span className="sm:hidden">Install</span>
+          <span className="sm:hidden text-[11px]">Install</span>
         </button>
 
         {showHelperModal && (
@@ -119,14 +119,14 @@ export function PWAInstallPrompt({
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-r from-blue-950/40 via-card to-indigo-950/40 p-4 shadow-sm backdrop-blur-sm">
+      <div className="relative overflow-hidden rounded-3xl border border-blue-500/30 bg-gradient-to-r from-blue-950/40 via-card to-indigo-950/40 p-3.5 sm:p-4 shadow-sm backdrop-blur-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600/20 text-blue-500 border border-blue-500/30">
               <Smartphone className="h-5 w-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <h4 className="text-sm font-bold text-foreground">
                   Install Academic AI on Android
                 </h4>
@@ -140,7 +140,7 @@ export function PWAInstallPrompt({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center">
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
             <button
               onClick={handleInstallClick}
               className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 transition-all"
@@ -180,8 +180,8 @@ function DeviceInstallModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-2 border-b">
           <div className="flex items-center gap-2 font-bold text-foreground">
             <Smartphone className="h-5 w-5 text-primary" />

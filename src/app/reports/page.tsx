@@ -83,13 +83,13 @@ export default function ReportsPage() {
         )}
 
         {/* Analytics Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Overall Status
             </span>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-foreground">
+              <span className="text-3xl sm:text-4xl font-black text-foreground">
                 {overall ? `${overall.overallPercentage}%` : "--"}
               </span>
               <span
@@ -107,12 +107,12 @@ export default function ReportsPage() {
             </p>
           </div>
 
-          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-3">
+          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Subject Compliance
             </span>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-emerald-500">
+              <span className="text-3xl sm:text-4xl font-black text-emerald-500">
                 {subjects.filter((s: any) => s.status === "Safe").length} / {subjects.length}
               </span>
               <span className="text-xs text-muted-foreground">Safe Subjects</span>
@@ -122,11 +122,11 @@ export default function ReportsPage() {
             </p>
           </div>
 
-          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-3">
+          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Total Excused / Cancelled
             </span>
-            <div className="text-4xl font-black text-zinc-400">
+            <div className="text-3xl sm:text-4xl font-black text-zinc-400">
               {overall?.totalCancelled || 0}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -136,8 +136,8 @@ export default function ReportsPage() {
         </div>
 
         {/* Visual Comparison Chart / Bars */}
-        <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <h2 className="text-base font-bold text-foreground">
               Subject Attendance vs. Target Threshold ({targetPct}%)
             </h2>
@@ -152,13 +152,13 @@ export default function ReportsPage() {
             <div className="space-y-4">
               {subjects.map((sub: any) => (
                 <div key={sub.subjectId} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-foreground">{sub.subjectCode}</span>
-                      <span className="text-muted-foreground truncate max-w-xs">{sub.subjectName}</span>
+                  <div className="flex items-center justify-between text-xs gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="font-extrabold text-foreground shrink-0">{sub.subjectCode}</span>
+                      <span className="text-muted-foreground truncate">{sub.subjectName}</span>
                     </div>
-                    <div className="flex items-center gap-3 font-semibold">
-                      <span>{sub.attended} / {sub.conducted} classes</span>
+                    <div className="flex items-center gap-2 sm:gap-3 font-semibold shrink-0">
+                      <span className="hidden xs:inline">{sub.attended}/{sub.conducted}</span>
                       <span
                         className={
                           sub.status === "Safe"
@@ -199,13 +199,13 @@ export default function ReportsPage() {
         </div>
 
         {/* Complete Table with Bunk / Attendance Requirements */}
-        <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+        <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-foreground">
             Subject-wise Academic Standing Report
           </h2>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[700px]">
               <thead className="border-b bg-muted/30 text-muted-foreground uppercase text-[10px] font-bold">
                 <tr>
                   <th className="px-4 py-3">Code</th>

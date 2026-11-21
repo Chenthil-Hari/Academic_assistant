@@ -214,16 +214,16 @@ export default function AttendancePage() {
 
         {/* Overall Summary Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-2">
+          <div className="rounded-3xl border bg-card p-3.5 sm:p-5 shadow-sm space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Overall Attendance
             </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-foreground">
+            <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-foreground">
                 {overall ? `${overall.overallPercentage}%` : "--%"}
               </span>
               <span
-                className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                className={`rounded-md px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${
                   (overall?.overallPercentage || 0) >= targetPct
                     ? "bg-emerald-500/10 text-emerald-500"
                     : "bg-red-500/10 text-red-500"
@@ -232,55 +232,55 @@ export default function AttendancePage() {
                 {overall?.status || "Safe"}
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground">
               Target minimum: {targetPct}%
             </p>
           </div>
 
-          <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-2">
+          <div className="rounded-3xl border bg-card p-3.5 sm:p-5 shadow-sm space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Attended Classes
             </span>
-            <div className="text-3xl font-black text-emerald-500">
+            <div className="text-2xl sm:text-3xl font-black text-emerald-500">
               {overall?.totalAttended || 0}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground">
               Total classes present
             </p>
           </div>
 
-          <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-2">
+          <div className="rounded-3xl border bg-card p-3.5 sm:p-5 shadow-sm space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Absent Classes
             </span>
-            <div className="text-3xl font-black text-red-500">
+            <div className="text-2xl sm:text-3xl font-black text-red-500">
               {overall?.totalAbsent || 0}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground">
               Missed classes
             </p>
           </div>
 
-          <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-2">
+          <div className="rounded-3xl border bg-card p-3.5 sm:p-5 shadow-sm space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Conducted Classes
             </span>
-            <div className="text-3xl font-black text-foreground">
+            <div className="text-2xl sm:text-3xl font-black text-foreground">
               {overall?.totalConducted || 0}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground">
               Attended + Absent
             </p>
           </div>
 
-          <div className="rounded-3xl border bg-card p-5 shadow-sm space-y-2">
+          <div className="rounded-3xl border bg-card p-3.5 sm:p-5 shadow-sm space-y-2 col-span-2 sm:col-span-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Cancelled / Excluded
             </span>
-            <div className="text-3xl font-black text-zinc-400">
+            <div className="text-2xl sm:text-3xl font-black text-zinc-400">
               {overall?.totalCancelled || 0}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground">
               Excluded from conducted
             </p>
           </div>
@@ -314,19 +314,19 @@ export default function AttendancePage() {
               {stats.subjects.map((sub: any) => (
                 <div
                   key={sub.subjectId}
-                  className="rounded-3xl border bg-card p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all"
+                  className="rounded-3xl border bg-card p-4 sm:p-5 shadow-sm space-y-4 hover:border-primary/40 transition-all"
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="font-extrabold text-base text-foreground">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-extrabold text-base text-foreground block truncate">
                         {sub.subjectCode}
                       </span>
-                      <h3 className="text-xs text-muted-foreground truncate max-w-[200px]">
+                      <h3 className="text-xs text-muted-foreground truncate">
                         {sub.subjectName}
                       </h3>
                     </div>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 ${
                         sub.status === "Safe"
                           ? "bg-emerald-500/10 text-emerald-500"
                           : sub.status === "Warning"
@@ -395,7 +395,7 @@ export default function AttendancePage() {
         </div>
 
         {/* Detailed Attendance Records Table with filters */}
-        <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-5">
+        <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-foreground">Attendance Records & History</h2>
@@ -409,7 +409,7 @@ export default function AttendancePage() {
               <select
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
-                className="rounded-xl border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                className="rounded-xl border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none max-w-full"
               >
                 <option value="">All Subjects</option>
                 {subjects.map((s) => (
@@ -422,7 +422,7 @@ export default function AttendancePage() {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="rounded-xl border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
+                className="rounded-xl border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none max-w-full"
               >
                 <option value="">All Statuses</option>
                 <option value="Attended">Attended</option>
@@ -443,7 +443,7 @@ export default function AttendancePage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[600px]">
               <thead className="border-b bg-muted/40 text-muted-foreground uppercase text-[10px] font-bold">
                 <tr>
                   <th className="px-4 py-3">Date</th>
@@ -526,8 +526,8 @@ export default function AttendancePage() {
 
         {/* Bunk Calculator Modal */}
         {showBunkModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <div className="flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-primary" />
@@ -591,7 +591,7 @@ export default function AttendancePage() {
                 <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
                   <div className="font-bold text-foreground text-sm">🧮 What-If Simulator</div>
                   <p className="text-muted-foreground text-[11px]">Simulate future classes to predict your attendance %.</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="font-semibold text-foreground">Future classes conducted</label>
                       <input
@@ -644,8 +644,8 @@ export default function AttendancePage() {
 
         {/* Edit Record Modal with Audit Log Reason */}
         {editRecord && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Edit Historical Attendance</h3>
                 <button
@@ -726,8 +726,8 @@ export default function AttendancePage() {
 
         {/* Audit Logs Drawer/Modal */}
         {showAuditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-2xl rounded-3xl border bg-card p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-2xl rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between pb-3 border-b">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-5 w-5 text-indigo-500" />
@@ -787,8 +787,8 @@ export default function AttendancePage() {
 
         {/* Add Subject Modal */}
         {showAddSubjectModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Add New Subject</h3>
                 <button
@@ -824,7 +824,7 @@ export default function AttendancePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-foreground">Credits</label>
                     <input
@@ -872,8 +872,8 @@ export default function AttendancePage() {
 
         {/* Add Record Modal */}
         {showAddRecordModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Record Attendance</h3>
                 <button
@@ -902,7 +902,7 @@ export default function AttendancePage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-foreground">Date *</label>
                     <input

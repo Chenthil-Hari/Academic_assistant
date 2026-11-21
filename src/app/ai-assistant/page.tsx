@@ -183,7 +183,7 @@ function AssistantChat() {
   };
 
   return (
-    <div className="relative flex h-[calc(100dvh-135px)] md:h-[calc(100vh-140px)] gap-6 overflow-hidden">
+    <div className="relative flex h-[calc(100dvh-175px)] md:h-[calc(100vh-140px)] gap-6 overflow-hidden min-w-0">
       {/* Mobile Drawer Backdrop */}
       {showHistoryMobile && (
         <div
@@ -257,7 +257,7 @@ function AssistantChat() {
       </div>
 
       {/* Main Chat Pane */}
-      <div className="flex flex-1 flex-col rounded-3xl border bg-card/80 shadow-sm backdrop-blur-md overflow-hidden">
+      <div className="flex flex-1 min-w-0 flex-col rounded-3xl border bg-card/80 shadow-sm backdrop-blur-md overflow-hidden">
         {/* Chat Header */}
         <div className="flex items-center justify-between border-b px-4 sm:px-6 py-3.5 sm:py-4">
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -370,7 +370,7 @@ function AssistantChat() {
         </div>
 
         {/* Quick Prompts Carousel */}
-        <div className="border-t bg-muted/20 px-4 py-2 flex items-center gap-2 overflow-x-auto">
+        <div className="border-t bg-muted/20 px-3 sm:px-4 py-2 flex items-center gap-2 overflow-x-auto min-w-0">
           <span className="text-[10px] font-bold text-muted-foreground uppercase shrink-0">
             Suggestions:
           </span>
@@ -378,7 +378,7 @@ function AssistantChat() {
             <button
               key={prompt}
               onClick={() => sendMessage(prompt)}
-              className="shrink-0 rounded-xl border bg-card px-3 py-1 text-[11px] font-medium text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm"
+              className="shrink-0 rounded-xl border bg-card px-2.5 sm:px-3 py-1 text-[11px] font-medium text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm"
             >
               {prompt}
             </button>
@@ -386,19 +386,19 @@ function AssistantChat() {
         </div>
 
         {/* Chat Input */}
-        <form onSubmit={handleSubmit} className="p-4 border-t bg-card/90">
+        <form onSubmit={handleSubmit} className="p-3 sm:p-4 border-t bg-card/90">
           <div className="relative flex items-center">
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Ask Academic AI about your schedule, attendance, or bunk buffer..."
-              className="w-full rounded-2xl border bg-background py-3 pl-4 pr-12 text-xs sm:text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full rounded-2xl border bg-background py-2.5 sm:py-3 pl-3 sm:pl-4 pr-11 text-xs sm:text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="submit"
               disabled={loading || !inputMessage.trim()}
-              className="absolute right-2 rounded-xl bg-primary p-2 text-primary-foreground shadow-sm hover:bg-primary/90 transition-all disabled:opacity-40"
+              className="absolute right-1.5 sm:right-2 rounded-xl bg-primary p-2 text-primary-foreground shadow-sm hover:bg-primary/90 transition-all disabled:opacity-40"
             >
               <Send className="h-4 w-4" />
             </button>

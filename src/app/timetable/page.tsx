@@ -175,11 +175,11 @@ export default function TimetablePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-xl border bg-card p-1">
               <button
                 onClick={() => setViewMode("weekly")}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all ${
                   viewMode === "weekly"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -189,7 +189,7 @@ export default function TimetablePage() {
               </button>
               <button
                 onClick={() => setViewMode("daily")}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-semibold transition-all ${
                   viewMode === "daily"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -201,7 +201,7 @@ export default function TimetablePage() {
 
             <Link
               href="/upload"
-              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 sm:px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
             >
               <UploadCloud className="h-4 w-4 text-primary" />
               <span>Import PDF</span>
@@ -209,7 +209,7 @@ export default function TimetablePage() {
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
             >
               <Plus className="h-4 w-4" />
               <span>Add Class Slot</span>
@@ -399,8 +399,8 @@ export default function TimetablePage() {
 
         {/* Add Slot Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <h3 className="font-bold text-base text-foreground">Add Timetable Slot</h3>
                 <button
@@ -444,7 +444,7 @@ export default function TimetablePage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-foreground">Start Time *</label>
                     <input
@@ -475,7 +475,7 @@ export default function TimetablePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-foreground">Room / Venue</label>
                     <input
@@ -524,8 +524,8 @@ export default function TimetablePage() {
 
         {/* Edit Slot Modal */}
         {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
                 <div>
                   <h3 className="font-bold text-base text-foreground">Edit Class Timing & Slot</h3>
@@ -572,7 +572,7 @@ export default function TimetablePage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-foreground">Start Time *</label>
                     <input
@@ -596,7 +596,7 @@ export default function TimetablePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-foreground">Room / Venue</label>
                     <input

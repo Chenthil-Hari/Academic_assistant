@@ -230,7 +230,7 @@ export default function UploadPage() {
         {/* Step 1: Upload Dropzone */}
         {step === "upload" && (
           <form onSubmit={handleUploadAndExtract} className="space-y-6">
-            <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-5">
+            <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-5">
               <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Step 1: Select Document Type
               </label>
@@ -673,11 +673,11 @@ export default function UploadPage() {
             )}
 
             {/* Confirm & Save Button */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t">
               <button
                 type="button"
                 onClick={() => setStep("upload")}
-                className="rounded-2xl border px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted"
+                className="rounded-2xl border px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted text-center"
               >
                 Back to Upload
               </button>
@@ -685,7 +685,7 @@ export default function UploadPage() {
                 type="button"
                 disabled={saving}
                 onClick={handleConfirmAndSave}
-                className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50 text-center"
               >
                 {saving ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

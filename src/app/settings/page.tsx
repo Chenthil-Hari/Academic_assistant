@@ -236,7 +236,7 @@ export default function SettingsPage() {
 
         <form onSubmit={handleSaveProfile} className="space-y-6">
           {/* Profile Details */}
-          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b">
               <User className="h-4 w-4 text-primary" />
               <h2 className="font-bold text-sm text-foreground">Student Profile Details</h2>
@@ -315,7 +315,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Attendance Criteria */}
-          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b">
               <Sliders className="h-4 w-4 text-primary" />
               <h2 className="font-bold text-sm text-foreground">Attendance Thresholds & Rules</h2>
@@ -346,7 +346,7 @@ export default function SettingsPage() {
           </div>
 
           {/* 4 PM Check-in & Notifications */}
-          <div className="rounded-3xl border bg-card p-6 shadow-sm space-y-5">
+          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-5">
             <div className="flex items-center justify-between pb-2 border-b">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-primary" />
@@ -359,7 +359,7 @@ export default function SettingsPage() {
 
             <div className="space-y-4 text-xs">
               {/* Web Push */}
-              <div className="flex items-start justify-between rounded-2xl border p-4 bg-muted/20">
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 bg-muted/20">
                 <div className="space-y-1">
                   <div className="font-bold text-foreground">Browser & Device Web Push</div>
                   <p className="text-muted-foreground text-[11px]">
@@ -373,14 +373,14 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={handleRequestPushPermission}
-                  className="rounded-xl border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                  className="rounded-xl border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shrink-0 w-full xs:w-auto text-center"
                 >
                   Enable Push
                 </button>
               </div>
 
               {/* Telegram Integration */}
-              <div className="rounded-2xl border p-4 bg-muted/20 space-y-3">
+              <div className="rounded-2xl border p-3.5 sm:p-4 bg-muted/20 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Send className="h-4 w-4 text-sky-500" />
@@ -407,7 +407,7 @@ export default function SettingsPage() {
                 </p>
 
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
                     <label className="font-semibold text-foreground">Telegram Chat ID</label>
                     {profile.telegramChatId && (
                       <button
@@ -434,7 +434,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Manual Checkin Test Trigger */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4 bg-primary/5 border-primary/20">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 bg-primary/5 border-primary/20">
                 <div className="space-y-1">
                   <div className="font-bold text-foreground">Test Daily 4:00 PM Check-in</div>
                   <p className="text-muted-foreground text-[11px]">

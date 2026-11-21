@@ -40,8 +40,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-background via-card to-background">
-      <div className="w-full max-w-md space-y-8 rounded-3xl border bg-card/70 p-8 shadow-2xl backdrop-blur-xl">
+    <div className="flex min-h-screen items-center justify-center p-3 sm:p-4 bg-gradient-to-b from-background via-card to-background">
+      <div className="w-full max-w-md space-y-6 sm:space-y-8 rounded-3xl border bg-card/70 p-5 sm:p-8 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col items-center text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25">
             <GraduationCap className="h-8 w-8" />

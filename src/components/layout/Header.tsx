@@ -90,9 +90,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card/80 px-4 md:px-8 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card/80 px-3 sm:px-6 md:px-8 backdrop-blur-md">
       {/* Left side: Hamburger & quick search/date */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <button
           onClick={onToggleSidebar}
           className="rounded-lg p-2 text-muted-foreground hover:bg-muted lg:hidden"
@@ -115,14 +115,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
       </div>
 
       {/* Right side: AI quick shortcut, Checkin button, notifications, theme toggle, user */}
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
         {/* PWA Install Button */}
         <PWAInstallPrompt variant="button" />
 
         {/* Quick AI button */}
         <Link
           href="/ai-assistant"
-          className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-primary/10 hover:bg-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition-all border border-primary/20"
+          className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-primary/10 hover:bg-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition-all border border-primary/20 shrink-0"
         >
           <Sparkles className="h-3.5 w-3.5 animate-pulse text-primary" />
           <span>Ask AI</span>
@@ -131,7 +131,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         {/* Quick Check-in trigger */}
         <Link
           href="/attendance"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all"
+          className="hidden xs:inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 transition-all shrink-0"
         >
           <CheckCircle className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Check-in</span>
@@ -153,7 +153,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-[-10px] sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border bg-card p-4 shadow-xl z-50">
+            <div className="fixed inset-x-3 top-16 sm:inset-auto sm:right-0 sm:top-full sm:absolute sm:mt-2 w-auto sm:w-80 max-w-sm rounded-2xl border bg-card p-4 shadow-xl z-50">
               <div className="flex items-center justify-between pb-3 border-b">
                 <span className="font-semibold text-sm">Notifications</span>
                 {unreadCount > 0 && (
