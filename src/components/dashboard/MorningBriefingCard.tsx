@@ -44,9 +44,9 @@ interface MorningBriefingData {
 
 const VOICES = [
   { id: "christopher", label: "Christopher (Natural Male)" },
-  { id: "jenny", label: "Jenny (Warm Female)" },
-  { id: "prabhat", label: "Prabhat (Indian Accent Male)" },
   { id: "neerja", label: "Neerja (Indian Accent Female)" },
+  { id: "prabhat", label: "Prabhat (Indian Accent Male)" },
+  { id: "jenny", label: "Jenny (Warm Female)" },
   { id: "aria", label: "Aria (News Anchor)" },
 ];
 
@@ -59,20 +59,37 @@ export function MorningBriefingCard() {
   const [selectedVoice, setSelectedVoice] = useState("christopher");
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
   const [audioProgress, setAudioProgress] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const loadedVoiceRef = useRef<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchBriefing();
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-      }
+      stopAndCleanupAudio();
     };
   }, []);
+
+  const stopAndCleanupAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    loadedVoiceRef.current = null;
+    setIsPlaying(false);
+    setIsPaused(false);
+    setAudioProgress(0);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
 
   const fetchBriefing = async () => {
     setLoading(true);
@@ -89,37 +106,40 @@ export function MorningBriefingCard() {
     }
   };
 
-  const handlePlayRealVoice = async () => {
-    // If paused, just resume
-    if (audioRef.current && isPaused) {
+  const playVoice = async (targetVoice: string) => {
+    // If the SAME voice is already loaded and was just paused, resume it
+    if (
+      audioRef.current &&
+      isPaused &&
+      loadedVoiceRef.current === targetVoice
+    ) {
       audioRef.current.play();
       setIsPlaying(true);
       setIsPaused(false);
       return;
     }
 
-    // If playing, pause
-    if (audioRef.current && isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      setIsPaused(true);
-      return;
-    }
+    // Stop and clean up any previous audio
+    stopAndCleanupAudio();
 
-    // Create or load audio
     setAudioLoading(true);
     try {
-      if (audioRef.current) {
-        audioRef.current.pause();
+      // Fetch fresh audio buffer directly using fetch to guarantee cookies and headers
+      const audioUrl = `/api/briefing/audio?voice=${targetVoice}&t=${Date.now()}`;
+      const res = await fetch(audioUrl, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error(`Audio API responded with status ${res.status}`);
       }
 
-      const audioUrl = `/api/briefing/audio?voice=${selectedVoice}&t=${Date.now()}`;
-      const audio = new Audio(audioUrl);
-      audio.playbackRate = playbackRate;
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      blobUrlRef.current = objectUrl;
 
-      audio.onloadedmetadata = () => {
-        setDuration(audio.duration || 0);
-      };
+      const audio = new Audio(objectUrl);
+      audio.playbackRate = playbackRate;
 
       audio.onplay = () => {
         setIsPlaying(true);
@@ -145,26 +165,82 @@ export function MorningBriefingCard() {
       };
 
       audio.onerror = () => {
-        console.warn("Real voice audio stream failed, falling back to Web Speech synthesis");
+        console.warn("Real audio playback failed, falling back to browser speech synthesis");
         setAudioLoading(false);
-        fallbackWebSpeech();
+        fallbackWebSpeech(targetVoice);
       };
 
       audioRef.current = audio;
+      loadedVoiceRef.current = targetVoice;
+
       await audio.play();
     } catch (err) {
-      console.warn("Audio playback error:", err);
+      console.warn("Audio loading error, falling back:", err);
       setAudioLoading(false);
-      fallbackWebSpeech();
+      fallbackWebSpeech(targetVoice);
     }
   };
 
-  const fallbackWebSpeech = () => {
+  const handlePlayButtonClick = () => {
+    if (isPlaying) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+        setIsPaused(true);
+      } else if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.pause();
+        setIsPlaying(false);
+        setIsPaused(true);
+      }
+      return;
+    }
+
+    playVoice(selectedVoice);
+  };
+
+  const handleVoiceChange = (newVoice: string) => {
+    setSelectedVoice(newVoice);
+    // If audio is currently playing or paused, immediately reload and play the new voice
+    if (isPlaying || isPaused || audioLoading) {
+      stopAndCleanupAudio();
+      playVoice(newVoice);
+    } else {
+      // Pre-clear so next play fetches the new voice
+      stopAndCleanupAudio();
+    }
+  };
+
+  const fallbackWebSpeech = (voiceKey: string) => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const textToSpeak = data?.briefingText || "Good morning! Your academic updates are ready.";
       const u = new SpeechSynthesisUtterance(textToSpeak);
       u.rate = playbackRate;
+
+      // Select matching voice in system
+      const voices = window.speechSynthesis.getVoices();
+      let matchedVoice = null;
+
+      if (voiceKey === "neerja" || voiceKey === "prabhat") {
+        matchedVoice = voices.find((v) => v.lang === "en-IN" || v.lang.startsWith("en-IN"));
+      } else if (voiceKey === "jenny" || voiceKey === "aria") {
+        matchedVoice = voices.find(
+          (v) =>
+            v.lang.startsWith("en") &&
+            (v.name.includes("Female") || v.name.includes("Zira") || v.name.includes("Samantha") || v.name.includes("Victoria"))
+        );
+      } else {
+        matchedVoice = voices.find(
+          (v) =>
+            v.lang.startsWith("en") &&
+            (v.name.includes("Male") || v.name.includes("David") || v.name.includes("Daniel") || v.name.includes("Guy"))
+        );
+      }
+
+      if (matchedVoice) {
+        u.voice = matchedVoice;
+      }
+
       u.onstart = () => {
         setIsPlaying(true);
         setIsPaused(false);
@@ -178,23 +254,7 @@ export function MorningBriefingCard() {
   };
 
   const handleStopVoice = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setIsPaused(false);
-      setAudioProgress(0);
-    }
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  };
-
-  const handleVoiceChange = (newVoice: string) => {
-    setSelectedVoice(newVoice);
-    if (isPlaying || isPaused) {
-      handleStopVoice();
-    }
+    stopAndCleanupAudio();
   };
 
   const handleRateChange = (newRate: number) => {
@@ -237,7 +297,7 @@ export function MorningBriefingCard() {
           <select
             value={selectedVoice}
             onChange={(e) => handleVoiceChange(e.target.value)}
-            className="rounded-xl border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+            className="rounded-xl border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-muted focus:outline-none focus:ring-1 focus:ring-primary shadow-xs cursor-pointer"
             title="Select natural neural voice"
           >
             {VOICES.map((v) => (
@@ -266,7 +326,7 @@ export function MorningBriefingCard() {
 
           {/* Voice Play/Pause button */}
           <button
-            onClick={handlePlayRealVoice}
+            onClick={handlePlayButtonClick}
             disabled={loading || audioLoading}
             className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all ${
               isPlaying
@@ -277,7 +337,7 @@ export function MorningBriefingCard() {
             {audioLoading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Loading Voice...</span>
+                <span>Switching Voice...</span>
               </>
             ) : isPlaying ? (
               <>
@@ -315,9 +375,9 @@ export function MorningBriefingCard() {
           <div className="flex items-center justify-between px-1 text-[10px] text-muted-foreground font-medium">
             <span className="flex items-center gap-1.5 text-primary font-bold">
               <Mic className="h-3 w-3 animate-pulse" />
-              Speaking via Neural Voice ({VOICES.find(v => v.id === selectedVoice)?.label})
+              Speaking as {VOICES.find(v => v.id === selectedVoice)?.label}
             </span>
-            <span>Real human voice generated via Neural TTS</span>
+            <span>Real Neural Voice (Edge TTS)</span>
           </div>
           <div className="flex items-center justify-center gap-1 py-1.5 px-4 rounded-xl bg-primary/10 border border-primary/20">
             <span className="h-3 w-1 bg-primary rounded-full animate-bounce [animation-delay:0ms]" />

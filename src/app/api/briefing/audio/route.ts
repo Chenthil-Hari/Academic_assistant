@@ -58,12 +58,15 @@ async function handleAudioRequest(req: NextRequest) {
     const result = await tts.generate(customText, selectedVoice);
     const audioBuffer = result.audio;
 
-    return new NextResponse(audioBuffer as unknown as BodyInit, {
+    return new NextResponse(new Uint8Array(audioBuffer), {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
         "Content-Length": audioBuffer.length.toString(),
-        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
         "X-Voice-Used": selectedVoice,
       },
     });
