@@ -72,19 +72,40 @@ export async function processUserMessage(params: {
       // Build context messages from history (last 10 turns)
       const systemPrompt = `
 You are the personal AI Academic Management Assistant built exclusively for ${studentName}.
-You serve as their private, dedicated student advisor, study planner, and attendance operating system.
-You know ${studentName}'s enrolled subjects, timetable schedule, bunk thresholds, exams, and calendar events.
+You serve as their private, dedicated student advisor, study planner, and attendance operating system across both the website and Telegram.
+You have complete access to ${studentName}'s personal student profile, enrolled subjects, timetable schedules, attendance records, bunk targets, exams, and calendar events.
 
 CRITICAL RULES:
-1. Always call the appropriate tool to fetch verified, authenticated data from ${studentName}'s MongoDB records.
-2. CONCISENESS & ACCURACY: Keep all answers short, punchy, and direct (1 to 2 sentences maximum). Do not use conversational filler. State the exact date, subject, or attendance figure immediately.
-   Example: "Pongal holiday starts on **January 14, 2027** and ends on **January 18, 2027**."
-3. NEVER fabricate, estimate, or hallucinate attendance numbers, subject codes, or dates.
-4. When answering questions about attendance, cite exact figures: Conducted, Attended, Absent, and Percentage.
-5. If ${studentName} asks "Can I miss a class?" or "How many classes must I attend?", call calculate_bunk_and_targets.
-6. If ${studentName} asks about their uploaded timetable or calendar PDF, document contents, or what was extracted from their files, call get_uploaded_document_details to inspect the uploaded records and answer accurately.
-7. If asked "what is the class now", "current class", or "what class do I have now", call get_today_schedule. If there is an active running class, state: "Right now at <Time>, you have **<Subject>** in **<Room>**." If no class is running right now, state when the next class starts, or that classes for today are complete.
-8. Format key items in **bold**.
+1. Always call the appropriate tool to fetch verified, authenticated live data from ${studentName}'s MongoDB records.
+2. PERSONAL PROFILE & IDENTITY:
+   - When asked about ${studentName}'s identity, roll number, college/university, department/branch, semester, email, target attendance %, or notification preferences (Telegram / Web Push), call get_user_profile.
+3. COMPLETE DETAILS & ACADEMIC OVERVIEW:
+   - When asked "tell me all my details and information", "show everything about me from the website", "who am I and what's my status?", or broad overview questions, call get_academic_dashboard_overview to give a complete, well-organized breakdown covering:
+     • Student Profile & Credentials
+     • Enrolled Subjects & Total Credits
+     • Overall Attendance Status & Target Threshold
+     • Schedule & Upcoming Events
+4. ENROLLED SUBJECTS & CREDITS:
+   - When asked about enrolled subjects, course codes, course credits, faculty, or teachers, call get_enrolled_subjects.
+5. TIMETABLE & CLASSES:
+   - For schedule today, current active class, or next class, call get_today_schedule. If there is an active running class, state: "Right now at <Time>, you have **<Subject>** in **<Room>**."
+   - For tomorrow, yesterday, or a specific day of the week (e.g. "what classes do I have on Friday?", "schedule tomorrow"), call get_schedule_for_day with dayOrDate.
+   - For the full weekly schedule (Monday - Saturday), call get_weekly_timetable.
+6. ATTENDANCE & BUNKS:
+   - For current subject-by-subject attendance percentages, call get_subject_attendance.
+   - If ${studentName} asks "Can I miss/bunk a class?", "How many classes can I bunk?", or "How many classes must I attend?", call calculate_bunk_and_targets.
+   - If asked about end-of-semester attendance projections or maximum achievable %, call predict_semester_attendance.
+   - If asked about attendance on a specific date (e.g. yesterday, last week) or recent attendance records, call get_attendance_history_or_records.
+7. ACADEMIC CALENDAR & HOLIDAYS:
+   - When asked about holidays (e.g. Pongal, Diwali, Christmas), exams, or assignment deadlines, call get_upcoming_academic_events.
+8. UPLOADED DOCUMENTS & PDFS:
+   - If asked about uploaded timetable or calendar PDFs or extracted schedules, call get_uploaded_document_details.
+9. ACCURACY & FORMATTING:
+   - NEVER fabricate, estimate, or hallucinate attendance numbers, subject codes, roll numbers, or dates.
+   - Cite exact numbers: Conducted, Attended, Absent, and Percentage.
+   - Format key entities in **bold**.
+   - For specific targeted questions (e.g. "What is my roll number?"), answer directly with the exact verified data.
+   - For comprehensive questions ("all my details"), provide a structured, complete response covering all relevant website information.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -182,6 +203,216 @@ async function runGroundedFallback(
 ): Promise<string> {
   const lower = message.toLowerCase();
 
+  // 1. Comprehensive Academic Overview / All Details from the Website
+  if (
+    (lower.includes("all") && (lower.includes("detail") || lower.includes("information") || lower.includes("info"))) ||
+    lower.includes("everything") ||
+    lower.includes("overview") ||
+    lower.includes("dashboard")
+  ) {
+    toolCalls.push("get_academic_dashboard_overview");
+    const data = await executeAiTool("get_academic_dashboard_overview", {}, userId);
+    const p = data.profile || {};
+    const a = data.attendance || {};
+    const subs = a.subjectBreakdown || [];
+
+    const subjectRows = subs
+      .map(
+        (s: any) =>
+          `• **${s.code}** (${s.name}): **${s.percentage}%** (${s.attended}/${s.conducted} classes) [${s.status}]`
+      )
+      .join("\n");
+
+    const todayClasses = (data.todaySchedule?.classes || [])
+      .map((c: any) => `• \`${c.time}\`: **${c.code}** (${c.name}) in Room **${c.room}**`)
+      .join("\n") || "No classes scheduled for today.";
+
+    return `🎓 **Comprehensive Academic Profile & Website Details for ${p.name || studentName}**
+
+👤 **Personal & Student Information:**
+• **Full Name:** ${p.name || "N/A"}
+• **Roll Number:** \`${p.rollNumber || "CH.SC.U4CSE4103"}\`
+• **College:** ${p.college || "Amrita Vishwa Vidhyapeetham"}
+• **Department / Branch:** ${p.branch || "Computer Science"}
+• **Semester:** Semester ${p.semester || 6}
+• **Registered Email:** \`${p.email || "N/A"}\`
+• **Target Attendance Threshold:** **${p.targetAttendance || 75}%**
+• **Telegram Assistant Connected:** ${p.telegramConnected ? "✅ Yes (Live)" : "❌ Not linked"}
+
+📊 **Current Attendance Summary:**
+• **Overall Attendance:** **${a.overallPercentage || 0}%** (${a.totalAttended || 0}/${a.totalConducted || 0} classes)
+• **Target:** **${a.targetPercentage || 75}%**
+• **Status:** **${a.status || "Safe"}**
+• **Enrolled Courses:** **${data.enrolment?.totalSubjects || subs.length}** subjects (${data.enrolment?.totalCredits || 0} credits)
+
+📚 **Subject Breakdown:**
+${subjectRows || "No subject attendance data available."}
+
+📅 **Today's Schedule:**
+${todayClasses}
+
+${data.nextEvent ? `📌 **Next Academic Event:** **${data.nextEvent.title}** on **${data.nextEvent.date}**${data.nextEvent.isHoliday ? " (🏖️ Holiday)" : ""}` : ""}
+
+💡 *You can ask me specific questions like "Can I bunk Distributed Systems?", "What classes do I have tomorrow?", or "When is Pongal holiday?" anytime!*`;
+  }
+
+  // 2. Personal Profile / Identity queries
+  if (
+    lower.includes("who am i") ||
+    lower.includes("my roll") ||
+    lower.includes("roll number") ||
+    lower.includes("my college") ||
+    lower.includes("my branch") ||
+    lower.includes("my department") ||
+    lower.includes("my semester") ||
+    lower.includes("my email") ||
+    lower.includes("my setting") ||
+    lower.includes("about me") ||
+    lower.includes("my profile") ||
+    lower.includes("my info")
+  ) {
+    toolCalls.push("get_user_profile");
+    const p = await executeAiTool("get_user_profile", {}, userId);
+    if (p.error) return `❌ ${p.error}`;
+
+    return `👤 **Student Profile & Account Details**
+
+• **Name:** **${p.name}**
+• **Roll Number:** \`${p.rollNumber}\`
+• **College:** **${p.college}**
+• **Department:** **${p.branch}**
+• **Current Semester:** **Semester ${p.semester}**
+• **Email:** \`${p.email}\`
+• **Target Attendance:** **${p.targetAttendancePercentage}%**
+• **Telegram Connected:** ${p.telegramConnected ? `✅ Yes (Chat ID: \`${p.telegramChatId}\`)` : "❌ Not connected"}
+• **Daily Check-in Time:** \`${p.notificationPreferences?.dailyCheckinTime || "16:00"}\` (${p.notificationPreferences?.timezone || "Asia/Kolkata"})
+• **Joined Academic AI:** ${p.accountCreatedAt || "Recently"}`;
+  }
+
+  // 3. Enrolled Subjects & Courses
+  if (
+    lower.includes("enrolled subject") ||
+    lower.includes("my subject") ||
+    lower.includes("all subject") ||
+    lower.includes("courses") ||
+    lower.includes("faculty") ||
+    lower.includes("professor") ||
+    lower.includes("credits")
+  ) {
+    toolCalls.push("get_enrolled_subjects");
+    const data = await executeAiTool("get_enrolled_subjects", {}, userId);
+    if (!data.subjects || data.subjects.length === 0) {
+      return "📚 You have not registered any subjects yet. You can add subjects or upload your timetable PDF on the website!";
+    }
+
+    const list = data.subjects
+      .map(
+        (s: any, idx: number) =>
+          `${idx + 1}. **${s.code}** — **${s.name}**\n   • Credits: **${s.credit}** | Min Attendance Target: **${s.minAttendanceThreshold}%**${s.faculty && s.faculty !== "Not assigned" ? ` | Faculty: *${s.faculty}*` : ""}`
+      )
+      .join("\n\n");
+
+    return `📚 **Your Registered Subjects (${data.totalSubjects} subjects, ${data.totalCredits} total credits):**\n\n${list}`;
+  }
+
+  // 4. Specific Day / Tomorrow / Yesterday Schedule
+  if (
+    lower.includes("tomorrow") ||
+    lower.includes("yesterday") ||
+    lower.includes("monday") ||
+    lower.includes("tuesday") ||
+    lower.includes("wednesday") ||
+    lower.includes("thursday") ||
+    lower.includes("friday") ||
+    lower.includes("saturday") ||
+    lower.includes("sunday")
+  ) {
+    let dayTarget = "today";
+    if (lower.includes("tomorrow")) dayTarget = "tomorrow";
+    else if (lower.includes("yesterday")) dayTarget = "yesterday";
+    else {
+      const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      for (const d of days) {
+        if (lower.includes(d)) {
+          dayTarget = d;
+          break;
+        }
+      }
+    }
+
+    toolCalls.push("get_schedule_for_day");
+    const data = await executeAiTool("get_schedule_for_day", { dayOrDate: dayTarget }, userId);
+
+    if (data.isHoliday) {
+      return `🎉 **${data.day} (${data.date}) is a Holiday!**\n\n${data.message}`;
+    }
+
+    if (!data.classes || data.classes.length === 0) {
+      return `📅 **Schedule for ${data.day} (${data.date})**\n\nYou have no classes scheduled for ${data.day}! Enjoy your day off.`;
+    }
+
+    const list = data.classes
+      .map(
+        (c: any, i: number) =>
+          `${i + 1}. **${c.subjectCode}** (${c.subjectName})\n   • Time: \`${c.time}\`\n   • Room: \`${c.room}\`\n   • Type: *${c.type}*`
+      )
+      .join("\n\n");
+
+    return `📅 **Classes for ${data.day} (${data.date})**\n\nYou have **${data.totalClasses}** class(es) scheduled:\n\n${list}`;
+  }
+
+  // 5. Attendance History / Past Records / Recent Check-in
+  if (
+    lower.includes("history") ||
+    lower.includes("recent attendance") ||
+    lower.includes("was i absent") ||
+    lower.includes("was i present") ||
+    lower.includes("attendance record") ||
+    lower.includes("attendance log")
+  ) {
+    toolCalls.push("get_attendance_history_or_records");
+    const dateParam = lower.includes("yesterday") ? "yesterday" : lower.includes("today") ? "today" : undefined;
+    const data = await executeAiTool("get_attendance_history_or_records", { date: dateParam, limit: 15 }, userId);
+
+    if (!data.records || data.records.length === 0) {
+      return "📋 No recent attendance logs found for this period. Mark your classes on the Attendance page or via Telegram 1-tap check-in!";
+    }
+
+    const list = data.records
+      .slice(0, 10)
+      .map(
+        (r: any) =>
+          `• **${r.date}**: **${r.subjectCode}** (${r.subjectName}) — **${r.status}** [via ${r.source || "manual"}]`
+      )
+      .join("\n");
+
+    return `📋 **Attendance Records (${data.count} recent sessions):**\n\n${list}`;
+  }
+
+  // 6. 1-Tap Check-in / Daily Check-in via Assistant
+  if (
+    lower.includes("check in") ||
+    lower.includes("checkin") ||
+    lower.includes("mark present") ||
+    lower.includes("mark attended") ||
+    lower.includes("mark all attended")
+  ) {
+    const action = lower.includes("mark") ? "mark_all_attended" : "get_checkin_status";
+    toolCalls.push("mark_attendance_checkin");
+    const data = await executeAiTool("mark_attendance_checkin", { action }, userId);
+
+    if (action === "mark_all_attended") {
+      return `🎉 **Daily Check-in Complete!**\n\n${data.message || "All classes for today marked as Attended."}`;
+    }
+
+    if (data.isHoliday) {
+      return `🎉 **Today is a Holiday!** No classes to check in for.`;
+    }
+
+    return `⚡ **Daily Check-in Status for Today**\n\n• Classes: **${data.totalClasses}**\n• Status: ${data.allConfirmed ? "✅ All confirmed" : "⏳ Pending confirmation"}\n\nSay *"Mark all attended"* or use the Telegram check-in button to confirm!`;
+  }
+
+  // 7. Uploaded Documents
   if (lower.includes("pdf") || lower.includes("uploaded") || lower.includes("document") || lower.includes("upload")) {
     toolCalls.push("get_uploaded_document_details");
     const data = await executeAiTool("get_uploaded_document_details", {}, userId);
@@ -196,16 +427,15 @@ async function runGroundedFallback(
 • **Uploaded**: ${new Date(d.uploadedAt).toLocaleDateString()}
 • **Status**: ${d.isVerified ? "✅ Verified & Active in System" : "⏳ Pending Verification on Upload Page"}
 • **Detected Subjects**: ${subjectsStr}
-• **Timetable Slots**: ${d.timetableSlotsCount} classes mapped
-• **Document Text Preview**:
-> *${d.rawTextSample ? d.rawTextSample.slice(0, 250).replace(/\s+/g, " ") : "No text available"}...*`;
+• **Timetable Slots**: ${d.timetableSlotsCount} classes mapped`;
       })
       .join("\n\n");
 
     return `📑 **Your Uploaded Academic Documents (${data.count})**\n\n${docsSummary}\n\n💡 *Ask me any questions about your timetable, classes today, or bunk buffers and I'll link it to your academic records!*`;
   }
 
-  if (lower.includes("today") || lower.includes("class today") || lower.includes("schedule today")) {
+  // 8. Schedule Today / Current Class
+  if (lower.includes("today") || lower.includes("class today") || lower.includes("schedule today") || lower.includes("class now") || lower.includes("current class")) {
     toolCalls.push("get_today_schedule");
     const data = await executeAiTool("get_today_schedule", {}, userId);
     if (data.isHoliday) {
@@ -220,9 +450,18 @@ async function runGroundedFallback(
           `${i + 1}. **${c.subjectCode}** (${c.subjectName})\n   • Time: \`${c.time}\`\n   • Room: \`${c.room}\`\n   • Type: *${c.type}*`
       )
       .join("\n\n");
-    return `📅 **Your Classes Today (${data.day}, ${data.date})**\n\nYou have **${data.totalClasses}** class(es) scheduled:\n\n${list}`;
+
+    let liveStatus = "";
+    if (data.currentClass) {
+      liveStatus = `\n\n🔔 **Right Now (${data.currentTimeIST}):** You have **${data.currentClass.code}** (${data.currentClass.name}) in Room **${data.currentClass.room}** (\`${data.currentClass.time}\`).`;
+    } else if (data.nextClass) {
+      liveStatus = `\n\n⏳ **Next Class:** **${data.nextClass.code}** in Room **${data.nextClass.room}** at \`${data.nextClass.time}\`.`;
+    }
+
+    return `📅 **Your Classes Today (${data.day}, ${data.date})**\n\nYou have **${data.totalClasses}** class(es) scheduled:\n\n${list}${liveStatus}`;
   }
 
+  // 9. Lowest Attendance
   if (lower.includes("lowest") && lower.includes("attendance")) {
     toolCalls.push("get_lowest_attendance_subject");
     const data = await executeAiTool("get_lowest_attendance_subject", {}, userId);
@@ -233,6 +472,7 @@ async function runGroundedFallback(
     return `⚠️ **Lowest Attendance Subject**\n\n• **${sub.code}** (${sub.name})\n• Current Attendance: **${sub.percentage}%**\n• Attended: **${sub.attended} / ${sub.conducted}** conducted classes\n\n${data.warning}`;
   }
 
+  // 10. Holidays & Exams
   if (
     lower.includes("pongal") ||
     lower.includes("diwali") ||
@@ -264,7 +504,6 @@ async function runGroundedFallback(
       return "No upcoming exams or holidays found in your academic calendar.";
     }
 
-    // Direct, short answer for specific holiday/event queries like Pongal
     if (searchTerm && data.events.length > 0) {
       const ev = data.events[0];
       const endStr = ev.endDate ? ` and ends on **${ev.endDate}**` : "";
@@ -281,9 +520,9 @@ async function runGroundedFallback(
     return `📌 **Academic Events & Holidays:**\n\n${list}`;
   }
 
+  // 11. Bunk & Target Calculator
   if (lower.includes("miss") || lower.includes("bunk") || lower.includes("reach") || lower.includes("%")) {
     toolCalls.push("calculate_bunk_and_targets");
-    // Check if a specific subject was asked
     const subMatch = message.match(/(?:in|for|of)\s+([A-Za-z0-9_-]+)/i);
     const subNameOrCode = subMatch ? subMatch[1] : undefined;
     const data = await executeAiTool("calculate_bunk_and_targets", { subjectNameOrCode: subNameOrCode }, userId);
@@ -296,6 +535,7 @@ async function runGroundedFallback(
     return `📊 **Attendance Bunk & Target Analysis for ${title}**\n\n• Current Attendance: **${data.currentPercentage}%**\n• Target Required: **${data.targetPercentage}%**\n• Conducted Classes: **${data.conducted || data.totalConducted}**\n• Attended Classes: **${data.attended || data.totalAttended}**\n\n💡 **Verdict:**\n${data.verdict}`;
   }
 
+  // 12. Weekly Timetable
   if (lower.includes("week") || lower.includes("timetable")) {
     toolCalls.push("get_weekly_timetable");
     const data = await executeAiTool("get_weekly_timetable", {}, userId);
@@ -312,7 +552,7 @@ async function runGroundedFallback(
     return out;
   }
 
-  // General Attendance overview
+  // 13. General Attendance Overview
   toolCalls.push("get_subject_attendance");
   const data = await executeAiTool("get_subject_attendance", {}, userId);
   if (data.overall) {
@@ -322,8 +562,8 @@ async function runGroundedFallback(
           `• **${s.subjectCode}**: **${s.percentage}%** (${s.attended}/${s.conducted} classes) [${s.status}]`
       )
       .join("\n");
-    return `📊 **Your Academic Attendance Summary**\n\n• **Overall Attendance:** **${data.overall.overallPercentage}%**\n• Target Threshold: **${data.overall.targetPercentage}%**\n• Status: **${data.overall.status}**\n\n**Subject Breakdown:**\n${list}\n\n*Ask me "Can I miss a class in DBMS?" or "What classes do I have today?" for specific details!*`;
+    return `📊 **Your Academic Attendance Summary**\n\n• **Overall Attendance:** **${data.overall.overallPercentage}%**\n• Target Threshold: **${data.overall.targetPercentage}%**\n• Status: **${data.overall.status}**\n\n**Subject Breakdown:**\n${list}\n\n*Ask me "Can I miss a class in DBMS?", "What is my schedule tomorrow?", or "Tell me all my details from the website" for specific info!*`;
   }
 
-  return `👋 Hi ${studentName}! I am your personal Academic AI Assistant. Ask me about your timetable today, subject attendance, bunk calculator, or upcoming exams!`;
+  return `👋 Hi ${studentName}! I am your personal Academic AI Assistant. Ask me anything about your student profile, roll number, subjects, timetable today or tomorrow, attendance, bunk buffers, or upcoming exams!`;
 }

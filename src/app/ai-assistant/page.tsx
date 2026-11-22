@@ -27,12 +27,16 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
+  "Show all my details and academic profile from the website",
+  "What is my roll number and department?",
   "What classes do I have today?",
+  "What is my schedule tomorrow?",
+  "List all my enrolled subjects and credits",
   "What is my max achievable attendance this semester?",
   "What is my attendance summary?",
-  "How many classes can I miss?",
+  "How many classes can I miss in Compiler Design?",
   "Which subject has the lowest attendance?",
-  "What exams are coming up?",
+  "What exams and holidays are coming up?",
   "Summarize my academic week.",
 ];
 
@@ -47,7 +51,7 @@ function AssistantChat() {
     {
       role: "assistant",
       content:
-        "👋 **Welcome to Academic AI Assistant!**\n\nI answer your questions using verified database queries and deterministic calculations.\n\nAsk me about your **schedule today**, **subject attendance**, **bunk safety calculations**, or **upcoming exams**!",
+        "👋 **Welcome to Academic AI Assistant!**\n\nI am your dedicated academic operating system. You can ask me **all details and information** related to you from the website:\n\n• 👤 **Profile & Identity**: Roll number, college, branch, semester, settings\n• 📚 **Academics**: Enrolled subjects, credits, faculty, weekly timetable\n• 📅 **Schedule**: Today's classes, live running class, tomorrow's schedule\n• 📊 **Attendance & Bunks**: Current percentages, bunk limits, semester predictions\n• 🎉 **Calendar**: Upcoming exams, assignment deadlines, holidays (Pongal, etc.)\n• 📑 **Uploaded PDFs**: Timetable and calendar files\n\nAsk me anything or pick a quick prompt below!",
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");

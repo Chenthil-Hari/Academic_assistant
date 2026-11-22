@@ -9,7 +9,10 @@ import {
   sendTelegramAlert,
   answerTelegramCallbackQuery,
   editTelegramMessage,
+  sendTelegramChatAction,
 } from "@/lib/notifications/telegram";
+import { processUserMessage } from "@/lib/ai/assistant-service";
+import { Conversation } from "@/lib/db/models/Conversation";
 
 export const dynamic = "force-dynamic";
 
@@ -163,16 +166,72 @@ export async function POST(req: NextRequest) {
 
     // Handle /start command
     if (text === "/start") {
-      const welcomeMsg = `👋 *Academic AI Notification Bot*\n\nHello *${user.name || "Hari"}*!\n\nYour Telegram account is connected to Academic AI. You will receive scheduled attendance notifications, daily checklists, and low attendance alerts here.\n\n👉 [Open Academic AI Dashboard](https://hari07.tech)`;
+      const welcomeMsg = `👋 *Academic AI Assistant*
+
+Hello *${user.name || "Hari"}*! 🎓
+
+I am your personal Academic AI Assistant on Telegram, connected directly to your website account at [hari07.tech](https://hari07.tech).
+
+You can ask me any question about yourself, your academics, and your website records:
+• 👤 *Profile & Info*: "What is my roll number?", "Which college & branch am I in?", "Show all my details"
+• 📊 *Attendance & Bunks*: "What is my overall attendance?", "Can I bunk Distributed Systems?", "How many classes can I miss?"
+• 📅 *Timetable & Schedule*: "What class do I have now?", "What is my schedule today?", "What classes do I have tomorrow?", "Show my weekly timetable"
+• 📚 *Subjects & Credits*: "List all my enrolled subjects", "What are my credits and faculty?"
+• 🎉 *Exams & Holidays*: "When is Pongal holiday?", "When are upcoming exams?"
+• 📑 *Uploaded PDFs*: "What was extracted from my timetable PDF?"
+• ⚡ *Check-in*: You will receive 1-tap check-in buttons here after classes!
+
+Go ahead and ask me anything!`;
       await sendTelegramAlert(chatId, welcomeMsg);
       return NextResponse.json({ ok: true });
     }
 
-    // Standard notification bot reply for any other messages
-    await sendTelegramAlert(
-      chatId,
-      `ℹ️ *Academic AI Notification Bot*\n\nThis bot is configured exclusively for notifications and attendance alerts.\n\nTo view your attendance, weekly timetable, or use the AI assistant, please visit [hari07.tech](https://hari07.tech).`
-    );
+    // Handle /help command
+    if (text === "/help") {
+      const helpMsg = `💡 *Academic AI Telegram Help*
+
+Here are some questions you can ask me anytime:
+• "Show all my details from the website"
+• "What is my roll number and department?"
+• "What classes do I have today?"
+• "What is my schedule tomorrow?"
+• "What is my current attendance?"
+• "Can I miss a class in Compiler Design?"
+• "What is my lowest attendance subject?"
+• "When is the next holiday?"
+• "Show my weekly timetable"
+
+Just send your question in plain English and I'll look up your live records immediately!`;
+      await sendTelegramAlert(chatId, helpMsg);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Send typing action so the user sees real-time indicator
+    await sendTelegramChatAction(chatId, "typing");
+
+    // Maintain a persistent conversation for Telegram chat
+    let telegramConv = await Conversation.findOne({
+      userId: user._id,
+      title: "Telegram Assistant Chat",
+    });
+
+    if (!telegramConv) {
+      telegramConv = await Conversation.create({
+        userId: user._id,
+        title: "Telegram Assistant Chat",
+        messages: [],
+      });
+    }
+
+    // Process user query through the full AI Assistant service
+    const aiResult = await processUserMessage({
+      userId: user._id.toString(),
+      conversationId: telegramConv._id.toString(),
+      message: text,
+    });
+
+    // Send AI assistant reply back to Telegram
+    await sendTelegramAlert(chatId, aiResult.response);
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

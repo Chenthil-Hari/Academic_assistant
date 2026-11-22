@@ -20,28 +20,97 @@ export async function sendTelegramAlert(
     return false;
   }
 
-  try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const payload: any = {
-      chat_id: chatId,
-      text: message,
-      parse_mode: "Markdown",
-    };
-
-    if (replyMarkup) {
-      payload.reply_markup = replyMarkup;
+  // Split into chunks if message exceeds Telegram's 4000 char limit
+  const MAX_LEN = 3900;
+  if (message.length > MAX_LEN) {
+    const chunks: string[] = [];
+    let remaining = message;
+    while (remaining.length > 0) {
+      if (remaining.length <= MAX_LEN) {
+        chunks.push(remaining);
+        break;
+      }
+      let splitIdx = remaining.lastIndexOf("\n\n", MAX_LEN);
+      if (splitIdx === -1) splitIdx = remaining.lastIndexOf("\n", MAX_LEN);
+      if (splitIdx === -1) splitIdx = MAX_LEN;
+      chunks.push(remaining.substring(0, splitIdx));
+      remaining = remaining.substring(splitIdx).trimStart();
     }
 
-    const response = await fetch(url, {
+    let allSent = true;
+    for (let i = 0; i < chunks.length; i++) {
+      const isLast = i === chunks.length - 1;
+      const sent = await sendSingleTelegramMessage(chatId, chunks[i], isLast ? replyMarkup : undefined);
+      if (!sent) allSent = false;
+    }
+    return allSent;
+  }
+
+  return sendSingleTelegramMessage(chatId, message, replyMarkup);
+}
+
+async function sendSingleTelegramMessage(
+  chatId: string,
+  text: string,
+  replyMarkup?: TelegramReplyMarkup
+): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  if (!token || !chatId) return false;
+
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const payload: any = {
+    chat_id: chatId,
+    text,
+    parse_mode: "Markdown",
+  };
+
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+
+  try {
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    let data = await response.json();
+    if (!data.ok) {
+      // If Markdown parsing failed, retry as plain text
+      delete payload.parse_mode;
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      data = await response.json();
+    }
+
     return Boolean(data.ok);
   } catch (err) {
     console.error("Telegram send error:", err);
+    return false;
+  }
+}
+
+export async function sendTelegramChatAction(
+  chatId: string,
+  action: "typing" | "upload_document" | "find_location" = "typing"
+): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
+  if (!token || !chatId) return false;
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendChatAction`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action }),
+    });
+    const data = await response.json();
+    return Boolean(data.ok);
+  } catch (err) {
     return false;
   }
 }
@@ -94,12 +163,21 @@ export async function editTelegramMessage(
       payload.reply_markup = replyMarkup;
     }
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
+    let data = await response.json();
+    if (!data.ok) {
+      delete payload.parse_mode;
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      data = await response.json();
+    }
     return Boolean(data.ok);
   } catch (err) {
     console.error("Telegram editMessageText error:", err);

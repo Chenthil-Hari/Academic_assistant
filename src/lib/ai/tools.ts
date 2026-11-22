@@ -17,11 +17,70 @@ export const AI_TOOLS_DEFINITIONS = [
   {
     type: "function" as const,
     function: {
-      name: "get_today_schedule",
-      description: "Get the authenticated user's classes scheduled for today, including times, subjects, and rooms.",
+      name: "get_user_profile",
+      description: "Retrieve the student's personal profile, identity, and account details from the website, including full name, email, college/university, department/branch, current semester, roll number, target attendance percentage, and notification preferences (Telegram, Web Push, daily check-in time).",
       parameters: {
         type: "object",
         properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_academic_dashboard_overview",
+      description: "Retrieve a complete 360-degree summary of all student details and academic information from the website: student profile (name, roll no, college, branch, semester), overall attendance and status, enrolled subjects count, today's schedule, uploaded documents, and upcoming events.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_enrolled_subjects",
+      description: "Retrieve all registered/enrolled subjects for the student, including course codes, names, credits, faculty/instructors, minimum attendance thresholds, and total credits.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectCodeOrName: {
+            type: "string",
+            description: "Optional subject code or name to look up a specific subject.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_schedule_for_day",
+      description: "Get the student's class schedule for any specific day of the week ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday') or relative day ('today', 'tomorrow', 'yesterday') or exact date ('YYYY-MM-DD'). Shows class times, subject codes, rooms, and whether it's a holiday.",
+      parameters: {
+        type: "object",
+        properties: {
+          dayOrDate: {
+            type: "string",
+            description: "The day to check: 'today', 'tomorrow', 'yesterday', a day of week like 'Monday', 'Friday', or an ISO date 'YYYY-MM-DD'. Defaults to 'today'.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_today_schedule",
+      description: "Get the authenticated user's classes scheduled for today (or specified day/date), including times, subjects, rooms, current running class, and next class.",
+      parameters: {
+        type: "object",
+        properties: {
+          dayOrDate: {
+            type: "string",
+            description: "Optional day of week ('Monday', etc.) or 'today', 'tomorrow', 'yesterday'. Defaults to 'today'.",
+          },
+        },
       },
     },
   },
@@ -141,7 +200,134 @@ export const AI_TOOLS_DEFINITIONS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_attendance_history_or_records",
+      description: "Retrieve specific attendance log records, check-in history, or check attendance for a particular date ('today', 'yesterday', or specific date) or subject.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Filter by subject code or name.",
+          },
+          date: {
+            type: "string",
+            description: "Filter by date: 'today', 'yesterday', or 'YYYY-MM-DD'.",
+          },
+          status: {
+            type: "string",
+            enum: ["Attended", "Absent", "Cancelled", "Pending", "All"],
+            description: "Filter by attendance status.",
+          },
+          limit: {
+            type: "number",
+            description: "Max number of records to return (default 20).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "mark_attendance_checkin",
+      description: "Perform daily check-in or mark classes for today as Attended or Absent. Actions: 'mark_all_attended', 'mark_all_absent', or 'get_checkin_status'.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["mark_all_attended", "mark_all_absent", "get_checkin_status"],
+            description: "Action to perform for today's classes.",
+          },
+        },
+      },
+    },
+  },
 ];
+
+function resolveTargetDateAndDay(input?: string): {
+  targetDate: Date;
+  dayOfWeek: number;
+  dayName: string;
+  isToday: boolean;
+  dateStr: string;
+} {
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const nowUtc = new Date();
+  const todayIst = new Date(nowUtc.getTime() + istOffset);
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const todayStr = todayIst.toISOString().split("T")[0];
+
+  if (!input || input.trim().toLowerCase() === "today") {
+    return {
+      targetDate: todayIst,
+      dayOfWeek: todayIst.getUTCDay(),
+      dayName: dayNames[todayIst.getUTCDay()],
+      isToday: true,
+      dateStr: todayStr,
+    };
+  }
+
+  const clean = input.trim().toLowerCase();
+  if (clean === "tomorrow") {
+    const tomorrowIst = new Date(todayIst.getTime() + 24 * 60 * 60 * 1000);
+    return {
+      targetDate: tomorrowIst,
+      dayOfWeek: tomorrowIst.getUTCDay(),
+      dayName: dayNames[tomorrowIst.getUTCDay()],
+      isToday: false,
+      dateStr: tomorrowIst.toISOString().split("T")[0],
+    };
+  }
+
+  if (clean === "yesterday") {
+    const yesterdayIst = new Date(todayIst.getTime() - 24 * 60 * 60 * 1000);
+    return {
+      targetDate: yesterdayIst,
+      dayOfWeek: yesterdayIst.getUTCDay(),
+      dayName: dayNames[yesterdayIst.getUTCDay()],
+      isToday: false,
+      dateStr: yesterdayIst.toISOString().split("T")[0],
+    };
+  }
+
+  const dayIdx = dayNames.findIndex((d) => d.toLowerCase() === clean);
+  if (dayIdx !== -1) {
+    let daysToAdd = (dayIdx - todayIst.getUTCDay() + 7) % 7;
+    const resolvedDate = new Date(todayIst.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    return {
+      targetDate: resolvedDate,
+      dayOfWeek: dayIdx,
+      dayName: dayNames[dayIdx],
+      isToday: daysToAdd === 0,
+      dateStr: resolvedDate.toISOString().split("T")[0],
+    };
+  }
+
+  const parsed = new Date(input);
+  if (!isNaN(parsed.getTime())) {
+    const parsedIst = new Date(parsed.getTime() + istOffset);
+    const pStr = parsedIst.toISOString().split("T")[0];
+    return {
+      targetDate: parsedIst,
+      dayOfWeek: parsedIst.getUTCDay(),
+      dayName: dayNames[parsedIst.getUTCDay()],
+      isToday: pStr === todayStr,
+      dateStr: pStr,
+    };
+  }
+
+  return {
+    targetDate: todayIst,
+    dayOfWeek: todayIst.getUTCDay(),
+    dayName: dayNames[todayIst.getUTCDay()],
+    isToday: true,
+    dateStr: todayStr,
+  };
+}
 
 /**
  * Executes a deterministic tool call against MongoDB with authenticated user isolation
@@ -155,18 +341,185 @@ export async function executeAiTool(
   const userObjectId = new mongoose.Types.ObjectId(userId);
 
   switch (toolName) {
-    case "get_today_schedule": {
+    case "get_user_profile": {
+      const user = await User.findById(userObjectId);
+      if (!user) return { error: "User profile not found." };
+      return {
+        name: user.name,
+        email: user.email,
+        college: user.college || "Amrita Vishwa Vidhyapeetham",
+        branch: user.branch || "Computer Science",
+        semester: user.semester || 6,
+        rollNumber: user.rollNumber || "CH.SC.U4CSE4103",
+        targetAttendancePercentage: user.targetAttendancePercentage || 75,
+        notificationPreferences: {
+          webPush: user.notificationPreferences?.webPush ?? true,
+          telegram: user.notificationPreferences?.telegram ?? true,
+          dailyCheckinTime: user.notificationPreferences?.dailyCheckinTime || "16:00",
+          timezone: user.notificationPreferences?.timezone || "Asia/Kolkata",
+        },
+        telegramConnected: Boolean(user.telegramChatId),
+        telegramChatId: user.telegramChatId || "",
+        accountCreatedAt: user.createdAt?.toISOString().split("T")[0] || "",
+      };
+    }
+
+    case "get_academic_dashboard_overview": {
+      const user = await User.findById(userObjectId);
+      const subjects = await Subject.find({ userId: userObjectId }).sort({ code: 1 });
+      const totalCredits = subjects.reduce((sum, s) => sum + (s.credit || 0), 0);
+      const defaultTarget = user?.targetAttendancePercentage || 75;
+
+      const attendanceAgg = await Attendance.aggregate([
+        { $match: { userId: userObjectId } },
+        {
+          $group: {
+            _id: { subjectId: "$subjectId", status: "$status" },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const countMap: Record<string, number> = {};
+      for (const row of attendanceAgg) {
+        if (row._id?.subjectId && row._id?.status) {
+          countMap[`${row._id.subjectId.toString()}_${row._id.status}`] = row.count;
+        }
+      }
+
+      let totalAttended = 0;
+      let totalAbsent = 0;
+      const subjectMetrics = subjects.map((sub) => {
+        const subId = sub._id.toString();
+        const attended = countMap[`${subId}_Attended`] || 0;
+        const absent = countMap[`${subId}_Absent`] || 0;
+        const conducted = attended + absent;
+        const percentage = conducted === 0 ? 100 : Number(((attended / conducted) * 100).toFixed(1));
+        totalAttended += attended;
+        totalAbsent += absent;
+        return {
+          code: sub.code,
+          name: sub.name,
+          credit: sub.credit,
+          faculty: sub.faculty || "Not assigned",
+          attended,
+          conducted,
+          percentage,
+          status: percentage >= (sub.minAttendanceThreshold || defaultTarget) ? "Safe" : "Warning",
+        };
+      });
+
+      const totalConducted = totalAttended + totalAbsent;
+      const overallPercentage = totalConducted === 0 ? 100 : Number(((totalAttended / totalConducted) * 100).toFixed(1));
+
+      // Today's classes
       const istOffset = 5.5 * 60 * 60 * 1000;
       const istDate = new Date(Date.now() + istOffset);
-      const dayOfWeek = istDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
+      const dayOfWeek = istDate.getUTCDay();
+      const slots = await Timetable.find({ userId: userObjectId, dayOfWeek, isActive: true })
+        .populate("subjectId", "code name room")
+        .sort({ "timeSlot.startTime": 1 });
+
+      // Upcoming holiday/exam
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const nextEvent = await AcademicEvent.findOne({ userId: userObjectId, date: { $gte: today } }).sort({ date: 1 });
+
+      return {
+        profile: {
+          name: user?.name,
+          email: user?.email,
+          college: user?.college || "Amrita Vishwa Vidhyapeetham",
+          branch: user?.branch || "Computer Science",
+          semester: user?.semester || 6,
+          rollNumber: user?.rollNumber || "CH.SC.U4CSE4103",
+          targetAttendancePercentage: defaultTarget,
+          telegramConnected: Boolean(user?.telegramChatId),
+        },
+        enrolment: {
+          totalSubjects: subjects.length,
+          totalCredits,
+          subjects: subjects.map((s) => `${s.code} - ${s.name} (${s.credit} credits)`),
+        },
+        attendance: {
+          overallPercentage,
+          totalConducted,
+          totalAttended,
+          totalAbsent,
+          targetPercentage: defaultTarget,
+          status: overallPercentage >= defaultTarget ? "Safe" : "Warning",
+          subjectBreakdown: subjectMetrics,
+        },
+        todaySchedule: {
+          totalClasses: slots.length,
+          classes: slots.map((s: any) => ({
+            code: s.subjectId?.code || "Unknown",
+            name: s.subjectId?.name || "Unknown",
+            time: `${s.timeSlot.startTime} - ${s.timeSlot.endTime}`,
+            room: s.room || "TBA",
+          })),
+        },
+        nextEvent: nextEvent
+          ? {
+              title: nextEvent.title,
+              date: nextEvent.date.toISOString().split("T")[0],
+              isHoliday: nextEvent.isHoliday,
+              type: nextEvent.type,
+            }
+          : null,
+      };
+    }
+
+    case "get_enrolled_subjects": {
+      const subjects = await Subject.find({ userId: userObjectId }).sort({ code: 1 });
+      const totalCredits = subjects.reduce((sum, s) => sum + (s.credit || 0), 0);
+
+      if (args?.subjectCodeOrName) {
+        const query = args.subjectCodeOrName.toLowerCase().trim();
+        const matched = subjects.filter(
+          (s) => s.code.toLowerCase().includes(query) || s.name.toLowerCase().includes(query)
+        );
+        return {
+          totalSubjects: subjects.length,
+          matchedCount: matched.length,
+          subjects: matched.map((s) => ({
+            code: s.code,
+            name: s.name,
+            credit: s.credit,
+            faculty: s.faculty || "Not assigned",
+            minAttendanceThreshold: s.minAttendanceThreshold || 75,
+            color: s.color,
+          })),
+        };
+      }
+
+      return {
+        totalSubjects: subjects.length,
+        totalCredits,
+        subjects: subjects.map((s) => ({
+          code: s.code,
+          name: s.name,
+          credit: s.credit,
+          faculty: s.faculty || "Not assigned",
+          minAttendanceThreshold: s.minAttendanceThreshold || 75,
+          color: s.color,
+        })),
+      };
+    }
+
+    case "get_schedule_for_day":
+    case "get_today_schedule": {
+      const resolved = resolveTargetDateAndDay(args?.dayOrDate);
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const istDate = new Date(Date.now() + istOffset);
       const hours = String(istDate.getUTCHours()).padStart(2, "0");
       const minutes = String(istDate.getUTCMinutes()).padStart(2, "0");
       const currentTimeIST = `${hours}:${minutes}`;
 
       // Check for holiday
-      const startOfDay = new Date(istDate);
+      const startOfDay = new Date(resolved.targetDate);
       startOfDay.setUTCHours(0, 0, 0, 0);
-      const endOfDay = new Date(istDate);
+      const endOfDay = new Date(resolved.targetDate);
       endOfDay.setUTCHours(23, 59, 59, 999);
 
       const holiday = await AcademicEvent.findOne({
@@ -177,34 +530,36 @@ export async function executeAiTool(
 
       if (holiday) {
         return {
+          day: resolved.dayName,
+          date: resolved.dateStr,
+          isToday: resolved.isToday,
           isHoliday: true,
           holidayTitle: holiday.title,
-          currentTimeIST,
-          message: `Today is an academic holiday: "${holiday.title}". No regular classes scheduled.`,
+          currentTimeIST: resolved.isToday ? currentTimeIST : undefined,
+          message: `${resolved.isToday ? "Today" : resolved.dayName} is an academic holiday: "${holiday.title}". No regular classes scheduled.`,
         };
       }
 
       const slots = await Timetable.find({
         userId: userObjectId,
-        dayOfWeek,
+        dayOfWeek: resolved.dayOfWeek,
         isActive: true,
       })
         .populate("subjectId", "code name color room faculty")
         .sort({ "timeSlot.startTime": 1 });
 
-      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-      const currentSlot = slots.find(
-        (s: any) => s.timeSlot.startTime <= currentTimeIST && s.timeSlot.endTime >= currentTimeIST
-      );
-      const nextSlot = slots.find(
-        (s: any) => s.timeSlot.startTime > currentTimeIST
-      );
+      const currentSlot = resolved.isToday
+        ? slots.find((s: any) => s.timeSlot.startTime <= currentTimeIST && s.timeSlot.endTime >= currentTimeIST)
+        : null;
+      const nextSlot = resolved.isToday
+        ? slots.find((s: any) => s.timeSlot.startTime > currentTimeIST)
+        : null;
 
       return {
-        day: dayNames[dayOfWeek],
-        date: istDate.toISOString().split("T")[0],
-        currentTimeIST,
+        day: resolved.dayName,
+        date: resolved.dateStr,
+        isToday: resolved.isToday,
+        currentTimeIST: resolved.isToday ? currentTimeIST : undefined,
         currentClass: currentSlot
           ? {
               code: (currentSlot as any).subjectId?.code || "Unknown",
@@ -233,6 +588,114 @@ export async function executeAiTool(
           faculty: s.subjectId?.faculty || "",
         })),
       };
+    }
+
+    case "get_attendance_history_or_records": {
+      const query: any = { userId: userObjectId };
+
+      if (args?.status && args.status !== "All") {
+        query.status = args.status;
+      }
+
+      if (args?.subjectNameOrCode) {
+        const subQuery = args.subjectNameOrCode.toLowerCase().trim();
+        const matchingSubjects = await Subject.find({
+          userId: userObjectId,
+          $or: [
+            { code: { $regex: subQuery, $options: "i" } },
+            { name: { $regex: subQuery, $options: "i" } },
+          ],
+        }).select("_id");
+        query.subjectId = { $in: matchingSubjects.map((s) => s._id) };
+      }
+
+      if (args?.date) {
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const nowUtc = new Date();
+        const todayIst = new Date(nowUtc.getTime() + istOffset);
+        let targetDate = todayIst;
+
+        const dStr = args.date.trim().toLowerCase();
+        if (dStr === "yesterday") {
+          targetDate = new Date(todayIst.getTime() - 24 * 60 * 60 * 1000);
+        } else if (dStr !== "today") {
+          const p = new Date(args.date);
+          if (!isNaN(p.getTime())) targetDate = p;
+        }
+
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        query.date = { $gte: startOfDay, $lte: endOfDay };
+      }
+
+      const limit = Number(args?.limit) || 20;
+      const records = await Attendance.find(query)
+        .populate("subjectId", "code name")
+        .sort({ date: -1, markedAt: -1 })
+        .limit(limit);
+
+      return {
+        count: records.length,
+        records: records.map((r: any) => ({
+          date: r.date?.toISOString().split("T")[0],
+          subjectCode: r.subjectId?.code || "Unknown",
+          subjectName: r.subjectId?.name || "Unknown",
+          status: r.status,
+          source: r.source,
+          markedAt: r.markedAt?.toISOString(),
+          notes: r.notes || "",
+        })),
+      };
+    }
+
+    case "mark_attendance_checkin": {
+      const action = args?.action || "get_checkin_status";
+      const { getOrCreateDailyCheckin } = await import("@/lib/attendance/session-generator");
+      const { createAuditLog } = await import("@/lib/db/audit");
+      const checkin = await getOrCreateDailyCheckin(userObjectId, new Date());
+
+      if (action === "get_checkin_status") {
+        return {
+          isHoliday: checkin.isHoliday,
+          holidayTitle: checkin.holidayTitle,
+          allConfirmed: checkin.allConfirmed,
+          totalClasses: checkin.items.length,
+          classes: checkin.items.map((i) => ({
+            code: i.subjectCode,
+            name: i.subjectName,
+            time: `${i.startTime} - ${i.endTime}`,
+            status: i.status,
+          })),
+        };
+      }
+
+      if (action === "mark_all_attended") {
+        let count = 0;
+        for (const item of checkin.items) {
+          await Attendance.updateOne(
+            { _id: item.attendanceId, userId: userObjectId },
+            { $set: { status: "Attended", markedAt: new Date(), source: "ai_assistant" } }
+          );
+          count++;
+        }
+        await createAuditLog({
+          userId: userObjectId,
+          action: "AI_ASSISTANT_MARK_ALL_ATTENDED",
+          entityType: "Attendance",
+          entityId: userObjectId,
+          newData: { status: "Attended", count },
+          reason: "Marked all classes attended via AI Assistant",
+        });
+        return {
+          success: true,
+          message: `Successfully marked all ${count} classes for today as Attended!`,
+          updatedCount: count,
+        };
+      }
+
+      return { error: `Action '${action}' not supported.` };
     }
 
     case "get_subject_attendance": {
