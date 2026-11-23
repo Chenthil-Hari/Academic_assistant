@@ -326,6 +326,168 @@ export const AI_TOOLS_DEFINITIONS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "log_gate_study_progress",
+      description: "Record completed GATE study hours, video lectures, and covered topics in the study tracker. Automatically deducts completed videos from the remaining workload.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Name or code of the GATE subject studied (e.g. 'Algorithms', 'DBMS', 'OS', 'Digital Logic', etc.). If omitted, applies to the highest priority active subject.",
+          },
+          hoursStudied: {
+            type: "number",
+            description: "Effective hours studied (e.g. 10.0, 4.0, 2.5).",
+          },
+          videosCompleted: {
+            type: "number",
+            description: "Number of lecture videos completed. If omitted, calculated from hours studied and subject average duration.",
+          },
+          topicsCovered: {
+            type: "string",
+            description: "Topics or chapter covered during this study session.",
+          },
+          notes: {
+            type: "string",
+            description: "Personal notes or remarks about this session.",
+          },
+        },
+        required: ["hoursStudied"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "add_gate_mistake",
+      description: "Log a conceptual misunderstanding, calculation trap, or tricky problem into the GATE Mistake Notebook for active recall and revision.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Subject name or code (e.g. 'Algorithms', 'Computer Networks').",
+          },
+          topic: {
+            type: "string",
+            description: "Specific topic or question context.",
+          },
+          myMistake: {
+            type: "string",
+            description: "What mistake was made or misunderstanding occurred.",
+          },
+          correctConcept: {
+            type: "string",
+            description: "The correct concept, formula, or approach to remember.",
+          },
+          gateYear: {
+            type: "number",
+            description: "Optional GATE paper year (e.g. 2023).",
+          },
+        },
+        required: ["topic", "myMistake", "correctConcept"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "log_gate_pyq_practice",
+      description: "Record a completed GATE Previous Year Questions (PYQ) practice session, tracking accuracy %, time taken, and difficulty.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Subject name or code (e.g. 'Operating Systems', 'DBMS').",
+          },
+          topic: {
+            type: "string",
+            description: "Topic of the PYQ set.",
+          },
+          questionsAttempted: {
+            type: "number",
+            description: "Total number of PYQ questions attempted.",
+          },
+          correctAnswers: {
+            type: "number",
+            description: "Number of correct answers.",
+          },
+          timeTakenMinutes: {
+            type: "number",
+            description: "Time taken in minutes.",
+          },
+          difficulty: {
+            type: "string",
+            enum: ["Easy", "Medium", "Hard"],
+            description: "Difficulty level of the problem set.",
+          },
+        },
+        required: ["subjectNameOrCode", "topic", "questionsAttempted", "correctAnswers"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "update_gate_user_settings",
+      description: "Configure GATE preparation constraints: daily study hours (up to 20), study days per week, playback speed (0.5x - 3.0x), or deadline.",
+      parameters: {
+        type: "object",
+        properties: {
+          dailyStudyHours: {
+            type: "number",
+            description: "Target daily effective study hours (e.g. 10, 11, 12).",
+          },
+          playbackSpeed: {
+            type: "number",
+            description: "Lecture playback speed multiplier (e.g. 1.25, 1.5, 1.75).",
+          },
+          phase1Deadline: {
+            type: "string",
+            description: "Target deadline date for Phase 1 completion (YYYY-MM-DD).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "add_academic_calendar_event",
+      description: "Add an exam, assignment deadline, holiday, or academic event to the user's academic calendar.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Event title (e.g. 'Operating Systems Endsem Exam', 'DBMS Project Submission').",
+          },
+          date: {
+            type: "string",
+            description: "Date of the event (YYYY-MM-DD).",
+          },
+          type: {
+            type: "string",
+            enum: ["Exam", "Assignment", "Holiday", "Other"],
+            description: "Type of event.",
+          },
+          description: {
+            type: "string",
+            description: "Optional description or notes about the event.",
+          },
+          subjectCodeOrName: {
+            type: "string",
+            description: "Optional associated subject code or name.",
+          },
+        },
+        required: ["title", "date", "type"],
+      },
+    },
+  },
 ];
 
 function resolveTargetDateAndDay(input?: string): {
@@ -1457,6 +1619,205 @@ export async function executeAiTool(
           correctConcept: m.correctConcept,
           gateYear: m.gateYear,
         })),
+      };
+    }
+
+    case "log_gate_study_progress": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateProgress } = await import("@/lib/db/models/GateProgress");
+
+      const hours = Number(args?.hoursStudied) || 1.5;
+      const subQuery = (args?.subjectNameOrCode || "").trim().toLowerCase();
+
+      let targetSubject;
+      if (subQuery) {
+        targetSubject = await GateSubject.findOne({
+          userId: userObjectId,
+          $or: [
+            { name: { $regex: subQuery, $options: "i" } },
+            { code: { $regex: subQuery, $options: "i" } },
+          ],
+        });
+      }
+      if (!targetSubject) {
+        targetSubject = await GateSubject.findOne({
+          userId: userObjectId,
+          remainingVideos: { $gt: 0 },
+        }).sort({ priorityOrder: 1 });
+      }
+
+      if (!targetSubject) {
+        return { success: false, message: "No active GATE subject found to log progress for." };
+      }
+
+      const avgDur = targetSubject.averageVideoDuration || 1.5;
+      const vids = args?.videosCompleted !== undefined
+        ? Number(args.videosCompleted)
+        : Math.max(1, Math.round(hours / avgDur));
+
+      const actualDeduct = Math.min(targetSubject.remainingVideos, vids);
+      targetSubject.remainingVideos = Math.max(0, targetSubject.remainingVideos - actualDeduct);
+      targetSubject.completedVideos = (targetSubject.completedVideos || 0) + actualDeduct;
+      if (targetSubject.remainingVideos === 0) targetSubject.status = "Completed";
+      await targetSubject.save();
+
+      const progressRecord = await GateProgress.create({
+        userId: userObjectId,
+        subjectId: targetSubject._id,
+        date: new Date(),
+        videosCompleted: actualDeduct,
+        hoursStudied: hours,
+        topicsCovered: args?.topicsCovered || `Study session for ${targetSubject.name}`,
+        notes: args?.notes || "Logged via AI Assistant",
+        completionStatus: "Completed",
+      });
+
+      return {
+        success: true,
+        message: `Successfully logged ${hours} hours for ${targetSubject.name}. ${actualDeduct} video(s) deducted.`,
+        subject: targetSubject.name,
+        remainingVideos: targetSubject.remainingVideos,
+        completedVideos: targetSubject.completedVideos,
+        progressId: progressRecord._id,
+      };
+    }
+
+    case "add_gate_mistake": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateMistake } = await import("@/lib/db/models/GateMistake");
+
+      let subjectId = undefined;
+      const subQuery = (args?.subjectNameOrCode || "").trim().toLowerCase();
+      if (subQuery) {
+        const sub = await GateSubject.findOne({
+          userId: userObjectId,
+          $or: [
+            { name: { $regex: subQuery, $options: "i" } },
+            { code: { $regex: subQuery, $options: "i" } },
+          ],
+        });
+        if (sub) subjectId = sub._id;
+      }
+
+      const mistake = await GateMistake.create({
+        userId: userObjectId,
+        subjectId,
+        topic: args?.topic || "GATE Concept",
+        myMistake: args?.myMistake || "",
+        correctConcept: args?.correctConcept || "",
+        gateYear: args?.gateYear ? Number(args.gateYear) : undefined,
+        isReviewed: false,
+      });
+
+      return {
+        success: true,
+        message: `Saved entry to GATE Mistake Notebook: "${args?.topic}". Remember: catching mistakes now saves marks in February!`,
+        mistakeId: mistake._id,
+      };
+    }
+
+    case "log_gate_pyq_practice": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GatePYQProgress } = await import("@/lib/db/models/GatePYQProgress");
+
+      let subjectId = undefined;
+      const subQuery = (args?.subjectNameOrCode || "").trim().toLowerCase();
+      if (subQuery) {
+        const sub = await GateSubject.findOne({
+          userId: userObjectId,
+          $or: [
+            { name: { $regex: subQuery, $options: "i" } },
+            { code: { $regex: subQuery, $options: "i" } },
+          ],
+        });
+        if (sub) subjectId = sub._id;
+      }
+
+      const attempted = Number(args?.questionsAttempted) || 10;
+      const correct = Number(args?.correctAnswers) || 0;
+      const incorrect = Math.max(0, attempted - correct);
+      const accuracy = attempted > 0 ? Number(((correct / attempted) * 100).toFixed(1)) : 0;
+
+      const pyq = await GatePYQProgress.create({
+        userId: userObjectId,
+        subjectId,
+        topic: args?.topic || "PYQ Practice",
+        year: 2024,
+        questionsAttempted: attempted,
+        correctAnswers: correct,
+        incorrectAnswers: incorrect,
+        accuracyPercentage: accuracy,
+        timeTakenMinutes: Number(args?.timeTakenMinutes) || 30,
+        difficulty: args?.difficulty || "Medium",
+        revisionStatus: "Pending Review",
+      });
+
+      return {
+        success: true,
+        message: `Logged PYQ session: ${attempted} attempted, ${correct} correct (${accuracy}% accuracy).`,
+        accuracyPercentage: accuracy,
+        pyqId: pyq._id,
+      };
+    }
+
+    case "update_gate_user_settings": {
+      const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
+
+      let settings = await GateUserSettings.findOne({ userId: userObjectId });
+      if (!settings) {
+        settings = new GateUserSettings({ userId: userObjectId });
+      }
+
+      if (args?.dailyStudyHours !== undefined) {
+        settings.dailyStudyHours = Math.max(1, Math.min(20, Number(args.dailyStudyHours)));
+      }
+      if (args?.playbackSpeed !== undefined) {
+        settings.playbackSpeed = Math.max(0.5, Math.min(3.0, Number(args.playbackSpeed)));
+      }
+      if (args?.phase1Deadline) {
+        settings.phase1Deadline = new Date(args.phase1Deadline);
+      }
+      await settings.save();
+
+      return {
+        success: true,
+        message: `Updated GATE settings: Daily study hours set to ${settings.dailyStudyHours}h, playback speed to ${settings.playbackSpeed}x.`,
+        dailyStudyHours: settings.dailyStudyHours,
+        playbackSpeed: settings.playbackSpeed,
+      };
+    }
+
+    case "add_academic_calendar_event": {
+      const { AcademicEvent } = await import("@/lib/db/models/AcademicEvent");
+      const { Subject } = await import("@/lib/db/models/Subject");
+
+      let subjectId = undefined;
+      const subQuery = (args?.subjectCodeOrName || "").trim().toLowerCase();
+      if (subQuery) {
+        const sub = await Subject.findOne({
+          userId: userObjectId,
+          $or: [
+            { code: { $regex: subQuery, $options: "i" } },
+            { name: { $regex: subQuery, $options: "i" } },
+          ],
+        });
+        if (sub) subjectId = sub._id;
+      }
+
+      const event = await AcademicEvent.create({
+        userId: userObjectId,
+        title: (args?.title || "Academic Event").trim(),
+        type: args?.type || "Exam",
+        date: new Date(args?.date || new Date()),
+        subjectId,
+        description: args?.description || "Added via AI Assistant",
+        isHoliday: args?.type === "Holiday",
+      });
+
+      return {
+        success: true,
+        message: `Added ${args?.type} event: "${event.title}" on ${event.date.toISOString().split("T")[0]}.`,
+        eventId: event._id,
       };
     }
 

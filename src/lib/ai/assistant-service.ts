@@ -115,6 +115,17 @@ CRITICAL RULES:
    - When asked about GATE Previous Year Questions (PYQ) or mistake notebook (e.g. "Show my PYQ stats", "Review my mistake notebook"), call get_gate_pyq_and_mistakes.
    - Strictly respect the student's constraints: 10 effective study hours/day, 6 study days/week, Sunday rest/revision, December 31, 2026 Phase 1 deadline, and January 2027 PYQ phase.
    - Never claim all subjects can be completed by the deadline if hours are mathematically insufficient; state the workload gap clearly and recommend focusing on High-Priority subjects or 1.25x playback speed.
+11. EXECUTING ACTIONS & COMMANDS (DOING WHAT THE STUDENT ASKS):
+   - You are fully authorized and expected to execute actions in ${studentName}'s live MongoDB records when commanded:
+   - When told to log study hours, videos, or progress (e.g. "I studied 4 hours of DBMS", "Log 10 hours of Algorithms", "Watched 2 videos of OS"), immediately call log_gate_study_progress.
+   - When told to add a mistake (e.g. "Add to my mistake notebook: ...", "Note this error: ..."), immediately call add_gate_mistake.
+   - When told to log PYQ practice (e.g. "Log 15 questions in OS, 12 correct"), immediately call log_gate_pyq_practice.
+   - When told to update settings (e.g. "Set daily study hours to 11", "Change playback speed to 1.5x"), call update_gate_user_settings.
+   - When told to mark attendance (e.g. "Mark today attended", "Mark all classes attended", "Mark absent"), call mark_attendance_checkin.
+   - When told to add an exam, assignment deadline, or calendar event, call add_academic_calendar_event.
+12. CONFIRMING EXECUTED ACTIONS:
+   - Always confirm completed actions with exact figures (hours recorded, videos deducted, date saved, new status).
+   - Never say you cannot execute an action; you have direct tools to mutate and persist the student's records.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -211,6 +222,71 @@ async function runGroundedFallback(
   studentName: string = "Hari"
 ): Promise<string> {
   const lower = message.toLowerCase();
+
+  // ─── ACTION COMMAND: Log GATE Study Progress ───
+  if (
+    lower.startsWith("log ") ||
+    lower.includes("log study") ||
+    lower.includes("i studied") ||
+    lower.includes("studied today") ||
+    lower.includes("completed videos") ||
+    lower.includes("watched videos")
+  ) {
+    toolCalls.push("log_gate_study_progress");
+    const hourMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:hour|hr|h\b)/i);
+    const hours = hourMatch ? Number(hourMatch[1]) : 1.5;
+
+    const subjectsList = [
+      "algorithms", "dbms", "operating systems", "os", "digital logic",
+      "computer networks", "coa", "theory of computation", "toc",
+      "discrete mathematics", "engineering mathematics", "data structures",
+      "compiler design", "general aptitude", "c programming"
+    ];
+    let detectedSubject = "";
+    for (const sub of subjectsList) {
+      if (lower.includes(sub)) {
+        detectedSubject = sub;
+        break;
+      }
+    }
+
+    const data = await executeAiTool("log_gate_study_progress", {
+      hoursStudied: hours,
+      subjectNameOrCode: detectedSubject || undefined,
+      notes: message,
+    }, userId);
+
+    return `✅ **GATE Study Session Logged!**\n\n• **Subject:** **${data.subject}**\n• **Hours Recorded:** **${hours} Hours**\n• **Remaining Videos:** **${data.remainingVideos} videos**\n• **Completed Videos:** **${data.completedVideos} videos**\n\n${data.message}\n\nKeep pushing — consistency is how AIR < 100 is forged! 🚀`;
+  }
+
+  // ─── ACTION COMMAND: Add GATE Mistake Notebook Entry ───
+  if (
+    lower.includes("mistake") ||
+    lower.includes("note error") ||
+    lower.includes("add error")
+  ) {
+    toolCalls.push("add_gate_mistake");
+    const data = await executeAiTool("add_gate_mistake", {
+      topic: "GATE Concept",
+      myMistake: message,
+      correctConcept: "Review notes and re-verify standard concept.",
+    }, userId);
+    return `📝 **GATE Mistake Notebook Entry Saved!**\n\n• **Note:** "${message}"\n• **Status:** Saved for active recall & revision.\n\nCatching conceptual traps now guarantees precision on exam day! 💡`;
+  }
+
+  // ─── ACTION COMMAND: Mark Attendance / Daily Check-in ───
+  if (
+    (lower.includes("mark") || lower.includes("check in") || lower.includes("checkin")) &&
+    (lower.includes("attended") || lower.includes("present") || lower.includes("absent"))
+  ) {
+    toolCalls.push("mark_attendance_checkin");
+    const isAbsent = lower.includes("absent");
+    const action = isAbsent ? "mark_all_absent" : "mark_all_attended";
+    const data = await executeAiTool("mark_attendance_checkin", { action }, userId);
+    return isAbsent
+      ? `⚠️ **Attendance Updated:** Marked today's scheduled classes as **Absent**. Audit record logged.`
+      : `✅ **Daily Attendance Confirmed!**\n\nAll scheduled classes for today have been marked as **Attended**! 🎉 Your attendance audit trail has been updated.`;
+  }
 
   // ─── GATE 2027 Preparation Planner Queries ───
   if (
