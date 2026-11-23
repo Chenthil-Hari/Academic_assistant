@@ -29,6 +29,7 @@ import {
   CalendarDays,
   BookmarkCheck,
   Info,
+  Send,
 } from "lucide-react";
 import { GateCountdownMotivationCard } from "@/components/gate/GateCountdownMotivationCard";
 
@@ -176,6 +177,24 @@ export default function GatePlannerPage() {
       }
     } catch (err: any) {
       showNotification(err.message, "error");
+    }
+  };
+
+  const [sendingTelegram, setSendingTelegram] = useState(false);
+  const handleSendTelegramBriefing = async () => {
+    setSendingTelegram(true);
+    try {
+      const res = await fetch("/api/cron/gate-daily?mode=morning&force=true", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showNotification("Automated GATE study briefing sent to your Telegram! 📲");
+      } else {
+        showNotification(data.message || "Failed to deliver Telegram alert", "error");
+      }
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    } finally {
+      setSendingTelegram(false);
     }
   };
 
@@ -419,6 +438,15 @@ export default function GatePlannerPage() {
               >
                 <RefreshCw className="h-4 w-4" />
                 Reschedule Missed
+              </button>
+              <button
+                onClick={handleSendTelegramBriefing}
+                disabled={sendingTelegram}
+                title="Send today's automated study target and schedule to your Telegram bot"
+                className="inline-flex items-center gap-2 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                {sendingTelegram ? "Sending..." : "Telegram Briefing"}
               </button>
             </div>
           </div>

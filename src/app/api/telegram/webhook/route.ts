@@ -125,6 +125,77 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
+      // Handle GATE 1-tap progress logging callbacks
+      if (data.startsWith("gate_log_")) {
+        const hours = Number(data.replace("gate_log_", "")) || 10;
+        let user = await User.findOne({ telegramChatId: chatId });
+        if (!user) user = await User.findOne({ email: "chenthilhari@gmail.com" });
+
+        if (!user) {
+          await answerTelegramCallbackQuery(cq.id, "User account not linked.", true);
+          return NextResponse.json({ ok: true });
+        }
+
+        const { GateSubject } = await import("@/lib/db/models/GateSubject");
+        const { GateProgress } = await import("@/lib/db/models/GateProgress");
+
+        let activeSubject = await GateSubject.findOne({
+          userId: user._id,
+          remainingVideos: { $gt: 0 },
+        }).sort({ priorityOrder: 1 });
+
+        const avgDuration = activeSubject?.averageVideoDuration || 1.5;
+        const videosToDeduct = Math.max(1, Math.round(hours / avgDuration));
+
+        if (activeSubject) {
+          const actualDeduct = Math.min(activeSubject.remainingVideos, videosToDeduct);
+          activeSubject.remainingVideos = Math.max(0, activeSubject.remainingVideos - actualDeduct);
+          activeSubject.completedVideos = (activeSubject.completedVideos || 0) + actualDeduct;
+          if (activeSubject.remainingVideos === 0) activeSubject.status = "Completed";
+          await activeSubject.save();
+
+          await GateProgress.create({
+            userId: user._id,
+            subjectId: activeSubject._id,
+            date: new Date(),
+            videosCompleted: actualDeduct,
+            hoursStudied: hours,
+            topicsCovered: `Telegram 1-Tap Daily Check-in (${hours}h)`,
+            notes: "Logged directly via Telegram 1-tap interactive button",
+            completionStatus: "Completed",
+          });
+        }
+
+        await answerTelegramCallbackQuery(cq.id, `🎉 ${hours} Hours Logged in GATE Planner!`, false);
+
+        if (messageId) {
+          const updatedMsg = `✅ *GATE Study Session Confirmed!*\n\n• **Hours Logged Today:** **${hours} Hours**\n• **Subject Progressed:** ${activeSubject ? activeSubject.name : "High-Priority Subject"}\n• **Videos Deducted:** ${videosToDeduct} videos\n\n🎉 Outstanding discipline, ${user.name || "Hari"}! Your consistency brings you one day closer to your dream IIT seat! Sleep well! 🚀`;
+          await editTelegramMessage(chatId, messageId, updatedMsg);
+        }
+
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "gate_reschedule_prompt") {
+        await answerTelegramCallbackQuery(cq.id, "Reply with /reschedule 2", false);
+        await sendTelegramAlert(
+          chatId,
+          `⚠️ *Rescheduling Study Sessions*\n\nDon't worry about missed hours! To roll forward your unfinished study hours without breaking your 10h/day cap, simply reply:\n\n👉 \`/reschedule 2\` (or any number of hours)\n\nOur intelligent scheduling engine will allocate buffer slots automatically!`
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      if (data === "gate_refresh_motivation") {
+        const { GATE_MOTIVATION_QUOTES } = await import("@/lib/gate/calculations");
+        const randomQuote = GATE_MOTIVATION_QUOTES[Math.floor(Math.random() * GATE_MOTIVATION_QUOTES.length)];
+        await answerTelegramCallbackQuery(cq.id, "Here is your fresh motivation!", false);
+        await sendTelegramAlert(
+          chatId,
+          `💡 *Fresh GATE Mindset Quote (${randomQuote.tag})*\n\n> _"${randomQuote.quote}"_\n> — *${randomQuote.author}*\n\n⚡ *Action Tip:* ${randomQuote.actionTip}`
+        );
+        return NextResponse.json({ ok: true });
+      }
+
       await answerTelegramCallbackQuery(cq.id);
       return NextResponse.json({ ok: true });
     }
@@ -202,8 +273,93 @@ Here are some questions you can ask me anytime:
 • "When is the next holiday?"
 • "Show my weekly timetable"
 
+🎯 *GATE 2027 Commands:*
+• \`/gate\` - Full GATE 2027 workload & deadline status
+• \`/today\` - Today's 10-hour study timetable
+• \`/motivate\` - Fresh GATE preparation motivation & mindset tip
+• \`/gatelog 10\` - Log 10 hours of study immediately
+• \`/reschedule 2\` - Reschedule 2 missed hours automatically
+
 Just send your question in plain English and I'll look up your live records immediately!`;
       await sendTelegramAlert(chatId, helpMsg);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Fast-path GATE commands
+    const lower = text.toLowerCase().trim();
+    if (lower === "/gate" || lower === "/gatestatus") {
+      const { executeAiTool } = await import("@/lib/ai/tools");
+      const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, user._id.toString());
+      const recs = (data.recommendations || []).map((r: string) => `• ${r}`).join("\n");
+      const msg = `🎯 *GATE 2027 Preparation Snapshot*\n━━━━━━━━━━━━━━━━━━━━\n• 🔥 *Days to GATE 2027 Exam:* **${data.daysRemainingUntilGateExam ?? 75} days** (${data.gateExamDate || "Feb 6, 2027"})\n• 📅 *Days to Phase 1 Finish:* **${data.daysRemainingUntilDeadline} days** (Dec 31, 2026)\n• 📚 *Remaining Videos:* **${data.totalRemainingVideos} videos** (${data.totalRemainingHours}h)\n• ⚡ *Available Study Capacity:* **${data.totalAvailableStudyHours} hrs** (@ 10h/day for ${data.effectiveStudyDays} study days)\n• 🎯 *Status:* ${data.isFeasibleByDeadline ? "✅ *ON TRACK*" : `⚠️ *WORKLOAD DEFICIT (${data.workloadGapHours} Hours)*`}\n\n💡 *Realistic Recommendations:*\n${recs}\n\n👉 [Open Full Planner on hari07.tech](https://hari07.tech/gate-planner)`;
+      await sendTelegramAlert(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (lower === "/today" || lower === "/gatetoday") {
+      const { executeAiTool } = await import("@/lib/ai/tools");
+      const data = await executeAiTool("get_gate_study_schedule_today", {}, user._id.toString());
+      const slotsList = (data.slots || [])
+        .map((s: any, idx: number) => `• *Slot ${idx + 1} (${s.timeSlot}):* ${s.subjectName} (${s.plannedHours}h) - _${s.sessionType}_`)
+        .join("\n") || "No slots scheduled";
+      const msg = `🎯 *GATE 2027 Study Schedule Today (${data.dayName}, ${data.date})*\n━━━━━━━━━━━━━━━━━━━━\n• *Daily Target:* **${data.totalPlannedHours} Hours** (10h Daily Budget)\n• *Logged So Far:* **${data.hoursStudiedToday} hrs** (${data.videosCompletedToday} videos)\n\n📋 *Planned Study Slots:*\n${slotsList}\n\n💡 _Focus on conceptual depth in high-priority subjects!_`;
+      await sendTelegramAlert(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (lower === "/motivate" || lower === "/gatemotivate") {
+      const { GATE_MOTIVATION_QUOTES } = await import("@/lib/gate/calculations");
+      const q = GATE_MOTIVATION_QUOTES[Math.floor(Math.random() * GATE_MOTIVATION_QUOTES.length)];
+      const msg = `🔥 *Daily GATE CSE Mindset (${q.tag})*\n━━━━━━━━━━━━━━━━━━━━\n> _"${q.quote}"_\n> — *${q.author}*\n\n⚡ *Action Tip:* ${q.actionTip}`;
+      await sendTelegramAlert(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (lower.startsWith("/gatelog")) {
+      const parts = lower.split(" ");
+      const hours = Number(parts[1]) || 10;
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateProgress } = await import("@/lib/db/models/GateProgress");
+
+      let activeSub = await GateSubject.findOne({
+        userId: user._id,
+        remainingVideos: { $gt: 0 },
+      }).sort({ priorityOrder: 1 });
+
+      const avgDur = activeSub?.averageVideoDuration || 1.5;
+      const vids = Math.max(1, Math.round(hours / avgDur));
+
+      if (activeSub) {
+        const actualDeduct = Math.min(activeSub.remainingVideos, vids);
+        activeSub.remainingVideos = Math.max(0, activeSub.remainingVideos - actualDeduct);
+        activeSub.completedVideos = (activeSub.completedVideos || 0) + actualDeduct;
+        if (activeSub.remainingVideos === 0) activeSub.status = "Completed";
+        await activeSub.save();
+
+        await GateProgress.create({
+          userId: user._id,
+          subjectId: activeSub._id,
+          date: new Date(),
+          videosCompleted: actualDeduct,
+          hoursStudied: hours,
+          topicsCovered: `Telegram /gatelog command (${hours}h)`,
+          notes: "Logged directly from Telegram",
+          completionStatus: "Completed",
+        });
+      }
+
+      const msg = `🎉 *GATE Study Logged Successfully!*\n\n• **Hours Recorded:** **${hours} Hours**\n• **Subject Progressed:** ${activeSub ? activeSub.name : "High-Priority Subject"}\n• **Videos Deducted:** ${vids} videos\n\nConsistency is how ranks under 100 are earned. Keep going! 🚀`;
+      await sendTelegramAlert(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (lower.startsWith("/reschedule") || lower.startsWith("/gatereschedule")) {
+      const parts = lower.split(" ");
+      const missed = Number(parts[1]) || 2;
+      const { executeAiTool } = await import("@/lib/ai/tools");
+      const data = await executeAiTool("reschedule_gate_missed_lectures", { missedHours: missed }, user._id.toString());
+      const msg = `🔄 *Missed Hours Rescheduled!*\n\n• **Hours Rescheduled:** **${data.missedHoursRescheduled} hrs**\n• **Algorithm Strategy:** ${data.redistributionStrategy}\n• **New Available Study Hours:** ${data.newAvailableStudyHours} hrs\n\n${data.feasibilityNote}`;
+      await sendTelegramAlert(chatId, msg);
       return NextResponse.json({ ok: true });
     }
 
