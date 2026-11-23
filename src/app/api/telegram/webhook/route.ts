@@ -178,6 +178,7 @@ You can ask me any question about yourself, your academics, and your website rec
 • 📅 *Timetable & Schedule*: "What class do I have now?", "What is my schedule today?", "What classes do I have tomorrow?", "Show my weekly timetable"
 • 📚 *Subjects & Credits*: "List all my enrolled subjects", "What are my credits and faculty?"
 • 🎉 *Exams & Holidays*: "When is Pongal holiday?", "When are upcoming exams?"
+• 🎯 *GATE 2027 Planner*: "What should I study today for GATE?", "Am I on track for Dec 31?", "Which subject is falling behind?", "Show my PYQ stats"
 • 📑 *Uploaded PDFs*: "What was extracted from my timetable PDF?"
 • ⚡ *Check-in*: You will receive 1-tap check-in buttons here after classes!
 

@@ -246,6 +246,86 @@ export const AI_TOOLS_DEFINITIONS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_gate_study_schedule_today",
+      description: "Retrieve the student's scheduled GATE 2027 study plan for today, including subjects to watch, time slots, planned lecture hours, and remaining videos to watch today (under the 10h/day cap).",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_gate_workload_and_deadline_status",
+      description: "Check if the student is on track for the GATE 2027 Phase 1 deadline (December 31, 2026), including total remaining lecture hours, completed videos, available study capacity, daily required hours, and mathematical feasibility gap.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_gate_subject_breakdown",
+      description: "Retrieve subject-by-subject GATE CSE preparation progress, remaining videos, hours, priority tier (High/Medium/Low), and completion percentages.",
+      parameters: {
+        type: "object",
+        properties: {
+          subjectNameOrCode: {
+            type: "string",
+            description: "Optional specific GATE subject code or name (e.g. 'ALGO', 'OS', 'DBMS', 'CN').",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_gate_weekly_study_report",
+      description: "Generate a weekly performance report for GATE preparation: total hours studied this week, adherence percentage against the 10h/day target, subjects falling behind, and recommendations.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reschedule_gate_missed_lectures",
+      description: "Reschedule missed or unfinished GATE study hours into upcoming study buffers without exceeding the 10-hour daily study limit.",
+      parameters: {
+        type: "object",
+        properties: {
+          missedHours: {
+            type: "number",
+            description: "Number of missed hours to reschedule (default 2.0).",
+          },
+          subjectNameOrCode: {
+            type: "string",
+            description: "Optional subject that was missed.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_gate_pyq_and_mistakes",
+      description: "Retrieve GATE Previous Year Questions (PYQ) practice stats, topic-wise accuracy %, questions solved, and unreviewed entries from the Mistake Notebook.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 function resolveTargetDateAndDay(input?: string): {
@@ -1112,6 +1192,266 @@ export async function executeAiTool(
           calendarEventsCount: d.extractedData?.calendarEvents?.length || 0,
           calendarEvents: (d.extractedData?.calendarEvents || []).slice(0, 30),
           rawTextSample: d.rawText ? d.rawText.slice(0, 3000) : "No text available.",
+        })),
+      };
+    }
+
+    case "get_gate_study_schedule_today": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
+      const { GateProgress } = await import("@/lib/db/models/GateProgress");
+      const { generateGateSchedule } = await import("@/lib/gate/scheduler");
+      const { INITIAL_GATE_SUBJECTS } = await import("@/lib/gate/calculations");
+
+      let count = await GateSubject.countDocuments({ userId: userObjectId });
+      if (count === 0) {
+        await GateSubject.insertMany(INITIAL_GATE_SUBJECTS.map((s) => ({ ...s, userId: userObjectId, initialVideos: s.remainingVideos, completedVideos: 0, status: "In Progress" })));
+      }
+
+      const [subjects, settings] = await Promise.all([
+        GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 }),
+        GateUserSettings.findOne({ userId: userObjectId }),
+      ]);
+
+      const schedule = generateGateSchedule({
+        subjects,
+        startDate: new Date(),
+        daysToGenerate: 1,
+        dailyStudyHours: settings?.dailyStudyHours || 10,
+      });
+
+      const todayPlan = schedule[0];
+
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const todayIst = new Date(Date.now() + istOffset);
+      const startOfDay = new Date(todayIst);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(todayIst);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      const todayProgress = await GateProgress.find({
+        userId: userObjectId,
+        date: { $gte: startOfDay, $lte: endOfDay },
+      }).populate("subjectId", "name code");
+
+      const hoursStudiedToday = todayProgress.reduce((sum, p) => sum + (p.hoursStudied || 0), 0);
+      const videosCompletedToday = todayProgress.reduce((sum, p) => sum + (p.videosCompleted || 0), 0);
+
+      return {
+        date: todayPlan.date,
+        dayName: todayPlan.dayName,
+        isRestDay: todayPlan.isRestDay,
+        totalPlannedHours: todayPlan.totalPlannedHours,
+        hoursStudiedToday,
+        videosCompletedToday,
+        statusSummary: todayPlan.statusSummary,
+        slots: todayPlan.slots.map((s) => ({
+          timeSlot: s.timeSlot,
+          subject: s.subjectName,
+          code: s.subjectCode,
+          type: s.sessionType,
+          plannedHours: s.plannedHours,
+          plannedVideos: s.plannedVideos,
+          topics: s.topics,
+        })),
+      };
+    }
+
+    case "get_gate_workload_and_deadline_status": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
+      const { calculateGateWorkload, INITIAL_GATE_SUBJECTS } = await import("@/lib/gate/calculations");
+
+      let count = await GateSubject.countDocuments({ userId: userObjectId });
+      if (count === 0) {
+        await GateSubject.insertMany(INITIAL_GATE_SUBJECTS.map((s) => ({ ...s, userId: userObjectId, initialVideos: s.remainingVideos, completedVideos: 0, status: "In Progress" })));
+      }
+
+      const [subjects, settings] = await Promise.all([
+        GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 }),
+        GateUserSettings.findOne({ userId: userObjectId }),
+      ]);
+
+      const workload = calculateGateWorkload({
+        subjects,
+        deadline: settings?.phase1Deadline,
+        dailyStudyHours: settings?.dailyStudyHours || 10,
+        playbackSpeed: settings?.playbackSpeed || 1.0,
+      });
+
+      return {
+        totalRemainingVideos: workload.totalRemainingVideos,
+        totalRemainingHours: workload.totalRemainingHours,
+        totalCompletedVideos: workload.totalCompletedVideos,
+        overallCompletionPercentage: workload.overallCompletionPercentage,
+        daysRemainingUntilDeadline: workload.daysRemainingUntilDeadline,
+        effectiveStudyDays: workload.effectiveStudyDays,
+        totalAvailableStudyHours: workload.totalAvailableStudyHours,
+        dailyRequiredLectureHours: workload.dailyRequiredLectureHours,
+        workloadGapHours: workload.workloadGapHours,
+        isFeasibleByDeadline: workload.isFeasibleByDeadline,
+        feasibilityVerdict: workload.feasibilityVerdict,
+        highPriorityRemainingHours: workload.highPriorityRemainingHours,
+        lowPriorityRemainingHours: workload.lowPriorityRemainingHours,
+        recommendations: workload.recommendations,
+      };
+    }
+
+    case "get_gate_subject_breakdown": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { INITIAL_GATE_SUBJECTS } = await import("@/lib/gate/calculations");
+
+      let count = await GateSubject.countDocuments({ userId: userObjectId });
+      if (count === 0) {
+        await GateSubject.insertMany(INITIAL_GATE_SUBJECTS.map((s) => ({ ...s, userId: userObjectId, initialVideos: s.remainingVideos, completedVideos: 0, status: "In Progress" })));
+      }
+
+      const subjects = await GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 });
+
+      if (args?.subjectNameOrCode) {
+        const query = args.subjectNameOrCode.toLowerCase().trim();
+        const matched = subjects.find(
+          (s) => s.code.toLowerCase().includes(query) || s.name.toLowerCase().includes(query)
+        );
+        if (!matched) {
+          return { error: `GATE subject '${args.subjectNameOrCode}' not found.` };
+        }
+        const remH = Number((matched.remainingVideos * (matched.averageVideoDuration || 1.5)).toFixed(1));
+        const init = matched.initialVideos || matched.remainingVideos;
+        const pct = init > 0 ? Number((((matched.completedVideos || 0) / init) * 100).toFixed(1)) : 100;
+        return {
+          name: matched.name,
+          code: matched.code,
+          priority: matched.priority,
+          priorityOrder: matched.priorityOrder,
+          remainingVideos: matched.remainingVideos,
+          completedVideos: matched.completedVideos || 0,
+          averageVideoDuration: matched.averageVideoDuration,
+          remainingHours: remH,
+          completionPercentage: pct,
+          status: matched.status,
+        };
+      }
+
+      return {
+        totalSubjects: subjects.length,
+        subjects: subjects.map((s) => ({
+          name: s.name,
+          code: s.code,
+          priority: s.priority,
+          priorityOrder: s.priorityOrder,
+          remainingVideos: s.remainingVideos,
+          completedVideos: s.completedVideos || 0,
+          averageVideoDuration: s.averageVideoDuration,
+          remainingHours: Number((s.remainingVideos * (s.averageVideoDuration || 1.5)).toFixed(1)),
+          completionPercentage: s.initialVideos > 0 ? Number((((s.completedVideos || 0) / s.initialVideos) * 100).toFixed(1)) : 100,
+          status: s.status,
+        })),
+      };
+    }
+
+    case "get_gate_weekly_study_report": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateProgress } = await import("@/lib/db/models/GateProgress");
+      const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
+
+      const [subjects, settings] = await Promise.all([
+        GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 }),
+        GateUserSettings.findOne({ userId: userObjectId }),
+      ]);
+
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const logs = await GateProgress.find({
+        userId: userObjectId,
+        date: { $gte: sevenDaysAgo },
+      }).populate("subjectId", "name code priority");
+
+      const totalActualHours = Number(logs.reduce((sum, l) => sum + (l.hoursStudied || 0), 0).toFixed(1));
+      const totalVideosCompleted = logs.reduce((sum, l) => sum + (l.videosCompleted || 0), 0);
+      const targetDailyHours = settings?.dailyStudyHours || 10;
+      const targetWeeklyHours = targetDailyHours * 6; // 6 study days
+      const adherencePercentage = targetWeeklyHours > 0 ? Number(((totalActualHours / targetWeeklyHours) * 100).toFixed(1)) : 100;
+
+      const highPriorityRemaining = subjects
+        .filter((s) => s.priority === "High" && s.remainingVideos > 0)
+        .sort((a, b) => (b.remainingVideos * b.averageVideoDuration) - (a.remainingVideos * a.averageVideoDuration));
+
+      const subjectsNeedingAttention = highPriorityRemaining.slice(0, 3).map((s) => `${s.name} (${s.remainingVideos} videos, ${(s.remainingVideos * s.averageVideoDuration).toFixed(1)} hrs left)`);
+
+      return {
+        weekWindow: `${sevenDaysAgo.toISOString().split("T")[0]} to ${now.toISOString().split("T")[0]}`,
+        totalActualHours,
+        targetWeeklyHours,
+        adherencePercentage,
+        totalVideosCompleted,
+        studySessionsCount: logs.length,
+        subjectsNeedingAttention,
+        status: adherencePercentage >= 85 ? "Excellent Pace" : adherencePercentage >= 60 ? "Moderate Progress (Catch-up recommended)" : "Falling Behind Schedule",
+        recommendation: adherencePercentage < 80 ? "Increase daily study hours to match your 10h budget or use 1.25x playback speed to recover lost pace." : "Great consistency! Keep reserving Sundays for revision.",
+      };
+    }
+
+    case "reschedule_gate_missed_lectures": {
+      const { GateSubject } = await import("@/lib/db/models/GateSubject");
+      const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
+      const { generateGateSchedule, rescheduleMissedHours } = await import("@/lib/gate/scheduler");
+
+      const missedH = Number(args?.missedHours) || 2.0;
+      const [subjects, settings] = await Promise.all([
+        GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 }),
+        GateUserSettings.findOne({ userId: userObjectId }),
+      ]);
+
+      const upcoming = generateGateSchedule({
+        subjects,
+        startDate: new Date(),
+        daysToGenerate: 14,
+        dailyStudyHours: settings?.dailyStudyHours || 10,
+      });
+
+      const rescheduled = rescheduleMissedHours({
+        missedHours: missedH,
+        upcomingDays: upcoming,
+        maxDailyHours: settings?.dailyStudyHours || 10,
+      });
+
+      return {
+        success: true,
+        message: `Successfully rescheduled ${missedH} missed hours across your upcoming study buffers without exceeding your ${settings?.dailyStudyHours || 10}h/day cap.`,
+        rescheduledDaysCount: rescheduled.length,
+      };
+    }
+
+    case "get_gate_pyq_and_mistakes": {
+      const { GatePYQProgress } = await import("@/lib/db/models/GatePYQProgress");
+      const { GateMistake } = await import("@/lib/db/models/GateMistake");
+
+      const [pyqDocs, mistakes] = await Promise.all([
+        GatePYQProgress.find({ userId: userObjectId }).populate("subjectId", "name code"),
+        GateMistake.find({ userId: userObjectId, isReviewed: false }).populate("subjectId", "name code").sort({ createdAt: -1 }),
+      ]);
+
+      const totalAttempted = pyqDocs.reduce((sum, p) => sum + (p.questionsAttempted || 0), 0);
+      const totalCorrect = pyqDocs.reduce((sum, p) => sum + (p.correctAnswers || 0), 0);
+      const overallAccuracy = totalAttempted > 0 ? Number(((totalCorrect / totalAttempted) * 100).toFixed(1)) : 0;
+
+      return {
+        pyqStats: {
+          totalAttempted,
+          totalCorrect,
+          overallAccuracy,
+          sessionsCount: pyqDocs.length,
+        },
+        unreviewedMistakesCount: mistakes.length,
+        unreviewedMistakes: mistakes.slice(0, 5).map((m: any) => ({
+          subject: m.subjectId?.name || "General",
+          topic: m.topic,
+          myMistake: m.myMistake,
+          correctConcept: m.correctConcept,
+          gateYear: m.gateYear,
         })),
       };
     }

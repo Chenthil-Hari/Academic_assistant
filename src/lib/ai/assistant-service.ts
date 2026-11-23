@@ -106,6 +106,15 @@ CRITICAL RULES:
    - Format key entities in **bold**.
    - For specific targeted questions (e.g. "What is my roll number?"), answer directly with the exact verified data.
    - For comprehensive questions ("all my details"), provide a structured, complete response covering all relevant website information.
+10. GATE 2027 PREPARATION PLANNER & STRATEGY:
+   - When asked "What should I study today for GATE?", "What are my study slots today?", or "How many videos do I need to complete today?", call get_gate_study_schedule_today.
+   - When asked "Am I on track for December 31?", "What is my GATE workload?", "How many hours remain?", or "Can I finish before January?", call get_gate_workload_and_deadline_status.
+   - When asked about subject progress, remaining lectures, or priorities (e.g. "How is DBMS going?", "Show all GATE subjects"), call get_gate_subject_breakdown.
+   - When asked "Which subject is falling behind?", "Show my weakest subjects", "How many hours have I studied this week?", or "Generate my weekly GATE report", call get_gate_weekly_study_report.
+   - When asked to reschedule missed or unfinished study hours (e.g. "Reschedule today's unfinished lectures", "I missed 2 hours"), call reschedule_gate_missed_lectures.
+   - When asked about GATE Previous Year Questions (PYQ) or mistake notebook (e.g. "Show my PYQ stats", "Review my mistake notebook"), call get_gate_pyq_and_mistakes.
+   - Strictly respect the student's constraints: 10 effective study hours/day, 6 study days/week, Sunday rest/revision, December 31, 2026 Phase 1 deadline, and January 2027 PYQ phase.
+   - Never claim all subjects can be completed by the deadline if hours are mathematically insufficient; state the workload gap clearly and recommend focusing on High-Priority subjects or 1.25x playback speed.
 `;
 
       const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -202,6 +211,72 @@ async function runGroundedFallback(
   studentName: string = "Hari"
 ): Promise<string> {
   const lower = message.toLowerCase();
+
+  // ─── GATE 2027 Preparation Planner Queries ───
+  if (
+    (lower.includes("study") && lower.includes("today")) ||
+    (lower.includes("gate") && lower.includes("today")) ||
+    (lower.includes("video") && lower.includes("today")) ||
+    lower.includes("what should i study")
+  ) {
+    toolCalls.push("get_gate_study_schedule_today");
+    const data = await executeAiTool("get_gate_study_schedule_today", {}, userId);
+    if (data.isRestDay) {
+      return `🏖️ **GATE Schedule Today (${data.dayName}, ${data.date})**\n\nToday is your designated **Rest & Optional Revision Day**! No mandatory 10h study required. Take time to recharge and do active recall of formulas.`;
+    }
+    const slotsList = (data.slots || [])
+      .map((s: any) => `• \`${s.timeSlot}\`: **${s.subject}** (${s.plannedHours} hrs, ~${s.plannedVideos} videos) — *${s.topics}*`)
+      .join("\n");
+    return `🎯 **Your GATE 2027 Study Schedule Today (${data.dayName}, ${data.date})**\n\n**Daily Target:** **${data.totalPlannedHours} Hours** (Max 10h Budget)\n**Progress Logged Today:** ${data.hoursStudiedToday} hrs (${data.videosCompletedToday} videos)\n\n**Planned Study Slots:**\n${slotsList}\n\n💡 *Stick to your 10h budget and reserve 1 hour in the evening for active recall!*`;
+  }
+
+  if (
+    lower.includes("on track") ||
+    lower.includes("december 31") ||
+    lower.includes("dec 31") ||
+    (lower.includes("gate") && lower.includes("deadline")) ||
+    (lower.includes("gate") && lower.includes("workload")) ||
+    lower.includes("can i finish")
+  ) {
+    toolCalls.push("get_gate_workload_and_deadline_status");
+    const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, userId);
+    const recs = (data.recommendations || []).map((r: string) => `• ${r}`).join("\n");
+    return `🎯 **GATE 2027 Phase 1 Deadline Feasibility Status**\n\n• **Target Deadline:** December 31, 2026\n• **Days Remaining:** **${data.daysRemainingUntilDeadline} days** (${data.effectiveStudyDays} effective study days)\n• **Remaining Lectures:** **${data.totalRemainingVideos} videos** (**${data.totalRemainingHours} lecture hours**)\n• **Study Capacity Available:** **${data.totalAvailableStudyHours} hours** (@ 10h/day)\n• **Status:** ${data.isFeasibleByDeadline ? "✅ **ON TRACK**" : `⚠️ **WORKLOAD DEFICIT (${data.workloadGapHours} Hours)**`}\n\n💡 **Realistic Recommendations:**\n${recs}`;
+  }
+
+  if (
+    lower.includes("falling behind") ||
+    lower.includes("weak") ||
+    lower.includes("weekly report") ||
+    lower.includes("studied this week") ||
+    (lower.includes("gate") && lower.includes("week"))
+  ) {
+    toolCalls.push("get_gate_weekly_study_report");
+    const data = await executeAiTool("get_gate_weekly_study_report", {}, userId);
+    const weakList = (data.subjectsNeedingAttention || []).map((s: string) => `• **${s}**`).join("\n") || "None";
+    return `📊 **Weekly GATE Preparation Report (${data.weekWindow})**\n\n• **Hours Studied This Week:** **${data.totalActualHours} hrs** / ${data.targetWeeklyHours} hrs planned\n• **Weekly Adherence:** **${data.adherencePercentage}%**\n• **Pace Verdict:** **${data.status}**\n• **Videos Completed:** **${data.totalVideosCompleted} videos** across ${data.studySessionsCount} study sessions\n\n⚠️ **High-Priority Subjects Needing Immediate Attention:**\n${weakList}\n\n💡 **Strategy:** ${data.recommendation}`;
+  }
+
+  if (lower.includes("reschedule") && (lower.includes("gate") || lower.includes("lecture") || lower.includes("missed") || lower.includes("unfinished") || lower.includes("study"))) {
+    toolCalls.push("reschedule_gate_missed_lectures");
+    const data = await executeAiTool("reschedule_gate_missed_lectures", { missedHours: 2.0 }, userId);
+    return `⚡ **GATE Study Rescheduling Complete!**\n\n${data.message}\n\nYour missed topics have been reallocated into upcoming buffer windows while keeping each day strictly under 10 hours.`;
+  }
+
+  if (lower.includes("pyq") || lower.includes("mistake")) {
+    toolCalls.push("get_gate_pyq_and_mistakes");
+    const data = await executeAiTool("get_gate_pyq_and_mistakes", {}, userId);
+    const mistakesList = (data.unreviewedMistakes || [])
+      .map((m: any) => `• **${m.subject}** (${m.topic}): *${m.myMistake}* ➡️ **Rule:** ${m.correctConcept}`)
+      .join("\n") || "No unreviewed mistakes currently!";
+    return `📝 **GATE Previous Year Questions (PYQ) & Mistake Notebook**\n\n• **PYQs Attempted:** **${data.pyqStats?.totalAttempted || 0} questions**\n• **Accuracy:** **${data.pyqStats?.overallAccuracy || 0}%** (${data.pyqStats?.totalCorrect || 0} correct)\n• **Unreviewed Mistakes:** **${data.unreviewedMistakesCount} concepts**\n\n🔍 **Recent Conceptual Errors to Review:**\n${mistakesList}\n\n*Review these on Sunday to eliminate recurring mistakes!*`;
+  }
+
+  if (lower.includes("gate")) {
+    toolCalls.push("get_gate_workload_and_deadline_status");
+    const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, userId);
+    return `🎯 **GATE 2027 Preparation Planner Status**\n\n• **Phase 1 Deadline:** December 31, 2026 (${data.daysRemainingUntilDeadline} days left)\n• **Remaining Videos:** **${data.totalRemainingVideos} videos** (${data.totalRemainingHours} hrs)\n• **Available Capacity:** **${data.totalAvailableStudyHours} hrs** (10h/day for ${data.effectiveStudyDays} study days)\n• **High-Priority Hours:** **${data.highPriorityRemainingHours} hrs**\n• **Daily Required:** **${data.dailyRequiredLectureHours} h/day**\n\n${data.feasibilityVerdict}\n\n*Ask "What should I study today?", "Am I on track?", or "Which subject is falling behind?" for more details!*`;
+  }
 
   // 1. Comprehensive Academic Overview / All Details from the Website
   if (

@@ -27,6 +27,10 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
+  "What should I study today for GATE 2027?",
+  "Am I on track for the GATE December 31 deadline?",
+  "Which GATE subject is falling behind?",
+  "Show my GATE PYQ practice stats and mistake notebook",
   "Show all my details and academic profile from the website",
   "What is my roll number and department?",
   "What classes do I have today?",

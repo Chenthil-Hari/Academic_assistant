@@ -13,6 +13,7 @@ import {
   UploadCloud,
   Settings,
   GraduationCap,
+  Target,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "GATE 2027 Planner", href: "/gate-planner", icon: Target, badge: "GATE" },
   { name: "Attendance", href: "/attendance", icon: CheckCircle2 },
   { name: "Timetable", href: "/timetable", icon: CalendarDays },
   { name: "Calendar", href: "/calendar", icon: Calendar },
