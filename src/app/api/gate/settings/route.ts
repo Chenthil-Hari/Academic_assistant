@@ -63,6 +63,9 @@ export async function PUT(req: NextRequest) {
     if (body.pyqStartDate) {
       settings.pyqStartDate = new Date(body.pyqStartDate);
     }
+    if (body.gateExamDate) {
+      settings.gateExamDate = new Date(body.gateExamDate);
+    }
     if (body.currentPhase) {
       settings.currentPhase = body.currentPhase;
     }

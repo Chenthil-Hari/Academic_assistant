@@ -30,6 +30,7 @@ import {
   BookmarkCheck,
   Info,
 } from "lucide-react";
+import { GateCountdownMotivationCard } from "@/components/gate/GateCountdownMotivationCard";
 
 export default function GatePlannerPage() {
   const [activeTab, setActiveTab] = useState<
@@ -462,6 +463,9 @@ export default function GatePlannerPage() {
           })}
         </div>
 
+        {/* Dedicated GATE 2027 Countdown & Daily Motivation Widget */}
+        <GateCountdownMotivationCard variant="planner" customWorkload={w} />
+
         {/* Top KPI Cards (Always visible on Overview, Tracker, Subjects) */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* Card 1: Remaining Videos */}
@@ -498,20 +502,20 @@ export default function GatePlannerPage() {
             </p>
           </div>
 
-          {/* Card 3: Days Remaining */}
+          {/* Card 3: Days Remaining to GATE Exam */}
           <div className="rounded-3xl border bg-card/60 p-4 sm:p-5 backdrop-blur-sm space-y-1.5 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-semibold uppercase tracking-wider">Until Dec 31</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">To GATE Exam</span>
               <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
-                <Calendar className="h-4 w-4" />
+                <Flame className="h-4 w-4" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-foreground">
-              {w.daysRemainingUntilDeadline}
+              {w.daysRemainingUntilGateExam ?? 75}
               <span className="text-xs font-normal text-muted-foreground ml-1.5">days</span>
             </div>
             <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-              {w.effectiveStudyDays} study days (excl. Sundays)
+              {w.daysRemainingUntilDeadline}d to Phase 1 (Dec 31)
             </p>
           </div>
 

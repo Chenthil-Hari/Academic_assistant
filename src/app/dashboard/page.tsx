@@ -26,6 +26,7 @@ import { formatTime } from "@/lib/utils";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { ElectricBorder } from "@/components/ui/ElectricBorder";
 import { useTheme } from "@/components/layout/ThemeProvider";
+import { GateCountdownMotivationCard } from "@/components/gate/GateCountdownMotivationCard";
 
 export default function DashboardPage() {
   const { actualTheme } = useTheme();
@@ -108,6 +109,9 @@ export default function DashboardPage() {
 
         {/* PWA Install Banner */}
         <PWAInstallPrompt variant="banner" />
+
+        {/* Dedicated GATE 2027 Countdown & Daily Motivation Widget */}
+        <GateCountdownMotivationCard variant="dashboard" />
 
         {/* Top Metrics Cards Grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

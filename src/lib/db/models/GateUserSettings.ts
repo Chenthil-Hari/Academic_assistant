@@ -7,6 +7,7 @@ export interface IGateUserSettings extends Document {
   restDayOfWeek: number; // default: 0 (Sunday)
   phase1Deadline: Date; // default: 2026-12-31
   pyqStartDate: Date; // default: 2027-01-01
+  gateExamDate: Date; // default: 2027-02-06 (GATE 2027 Exam Date)
   currentPhase: "Phase 1 - Lectures & Concept" | "Phase 2 - PYQ Practice";
   playbackSpeed: number; // default: 1.0
   revisionHoursDaily: number; // e.g. 1.0 hour inside the 10 hours
@@ -46,6 +47,10 @@ const GateUserSettingsSchema = new Schema<IGateUserSettings>(
     pyqStartDate: {
       type: Date,
       default: () => new Date("2027-01-01T00:00:00.000Z"),
+    },
+    gateExamDate: {
+      type: Date,
+      default: () => new Date("2027-02-06T09:00:00.000Z"),
     },
     currentPhase: {
       type: String,

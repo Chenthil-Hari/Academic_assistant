@@ -231,6 +231,22 @@ async function runGroundedFallback(
   }
 
   if (
+    lower.includes("motivation") ||
+    lower.includes("quote") ||
+    lower.includes("inspire") ||
+    lower.includes("mindset") ||
+    lower.includes("days left") ||
+    lower.includes("days for gate") ||
+    lower.includes("how many days") ||
+    lower.includes("remaining days")
+  ) {
+    toolCalls.push("get_gate_workload_and_deadline_status");
+    const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, userId);
+    const mot = data.dailyMotivation || {};
+    return `🔥 **GATE 2027 Countdown & Daily Motivation**\n\n• **Days Until GATE 2027 Exam:** **${data.daysRemainingUntilGateExam ?? 75} days** (${data.gateExamDate || "Feb 2027"})\n• **Days Until Phase 1 Deadline:** **${data.daysRemainingUntilDeadline} days** (Dec 31, 2026)\n• **Remaining Lecture Hours:** **${data.totalRemainingHours} hrs** across ${data.totalRemainingVideos} videos\n\n💡 **Daily Mindset Quote (${mot.tag || "Consistency"}):**\n> *"${mot.quote || "Discipline is choosing between what you want now and what you want most. Focus on the IIT goal."}"*\n> — **${mot.author || "GATE AIR 1 Mindset"}**\n\n⚡ **Today's Action Tip:** ${mot.actionTip || "Complete today's 10 hours with 100% focus."}`;
+  }
+
+  if (
     lower.includes("on track") ||
     lower.includes("december 31") ||
     lower.includes("dec 31") ||

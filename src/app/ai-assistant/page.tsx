@@ -27,6 +27,7 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
+  "How many days left for GATE exam & give me motivation",
   "What should I study today for GATE 2027?",
   "Am I on track for the GATE December 31 deadline?",
   "Which GATE subject is falling behind?",

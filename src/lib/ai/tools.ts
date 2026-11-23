@@ -1275,6 +1275,7 @@ export async function executeAiTool(
       const workload = calculateGateWorkload({
         subjects,
         deadline: settings?.phase1Deadline,
+        gateExamDate: settings?.gateExamDate || new Date("2027-02-06T09:00:00.000Z"),
         dailyStudyHours: settings?.dailyStudyHours || 10,
         playbackSpeed: settings?.playbackSpeed || 1.0,
       });
@@ -1284,7 +1285,10 @@ export async function executeAiTool(
         totalRemainingHours: workload.totalRemainingHours,
         totalCompletedVideos: workload.totalCompletedVideos,
         overallCompletionPercentage: workload.overallCompletionPercentage,
+        daysRemainingUntilGateExam: workload.daysRemainingUntilGateExam,
         daysRemainingUntilDeadline: workload.daysRemainingUntilDeadline,
+        gateExamDate: workload.gateExamDate,
+        dailyMotivation: workload.motivation,
         effectiveStudyDays: workload.effectiveStudyDays,
         totalAvailableStudyHours: workload.totalAvailableStudyHours,
         dailyRequiredLectureHours: workload.dailyRequiredLectureHours,

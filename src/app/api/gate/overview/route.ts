@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     const workload = calculateGateWorkload({
       subjects,
       deadline: settings.phase1Deadline,
+      gateExamDate: settings.gateExamDate || new Date("2027-02-06T09:00:00.000Z"),
       dailyStudyHours: settings.dailyStudyHours || 10,
       studyDaysPerWeek: settings.studyDaysPerWeek || 6,
       playbackSpeed: settings.playbackSpeed || 1.0,

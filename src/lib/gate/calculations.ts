@@ -155,6 +155,70 @@ export interface SubjectWorkloadMetrics {
   estimatedCompletionDate?: string;
 }
 
+export interface GateMotivation {
+  quote: string;
+  author: string;
+  tag: string;
+  actionTip: string;
+}
+
+export const GATE_MOTIVATION_QUOTES: GateMotivation[] = [
+  {
+    quote: "Top IITs and IISc do not demand genius; they demand consistent, unyielding daily discipline. 10 focused hours today buys your seat in the master's program of your dreams.",
+    author: "AIR 1 Mindset",
+    tag: "Consistency",
+    actionTip: "Complete your scheduled 4-hour morning deep focus block without touching your phone.",
+  },
+  {
+    quote: "GATE is not a test of memorization, but a test of conceptual clarity. When your fundamentals in Data Structures, OS, and Algorithms are rock-solid, every question unfolds naturally.",
+    author: "Conceptual Mastery",
+    tag: "Fundamentals",
+    actionTip: "Focus on understanding the 'why' behind algorithmic complexities rather than just mugging up formulas.",
+  },
+  {
+    quote: "Every video lecture watched, every concept noted, and every test analyzed is an irreversible deposit into your AIR < 100 bank account.",
+    author: "IIT Dreamer",
+    tag: "Daily Progress",
+    actionTip: "Don't measure progress by exhaustion; measure it by clarity gained in today's subject.",
+  },
+  {
+    quote: "The pain of waking up early and studying 10 hours today is nothing compared to the regret of missing your dream IIT cutoff by 2 marks. Push through today's resistance.",
+    author: "Relentless Focus",
+    tag: "Discipline",
+    actionTip: "When you feel like quitting early, remember: your competitors are still studying right now.",
+  },
+  {
+    quote: "Phase 1 builds your impenetrable conceptual armor; Phase 2 sharpens your PYQ sword. Trust the timeline, follow the schedule, and conquer the syllabus.",
+    author: "Strategic Execution",
+    tag: "Roadmap",
+    actionTip: "Stick to High-Priority subjects first. Mastering 85% of high-yield topics beats skimming 100% of everything.",
+  },
+  {
+    quote: "Discipline is choosing between what you want right now and what you want most in life. The gates of IIT Bombay, IIT Madras, and IISc are waiting for you.",
+    author: "Future M.Tech Scholar",
+    tag: "Vision",
+    actionTip: "Write down your target rank on your desk and give your 100% to today's study blocks.",
+  },
+  {
+    quote: "Mistakes made in your notes and practice tests are goldmines. Every error you catch and document now is one less trap you'll fall into on exam day.",
+    author: "Accuracy Engineering",
+    tag: "Mistake Notebook",
+    actionTip: "Log any tricky question or misunderstanding immediately in your GATE Mistake Notebook.",
+  },
+  {
+    quote: "Small disciplines repeated with unwavering consistency every single day lead to monumental achievements in February. Make today count.",
+    author: "GATE 2027 Aspirant",
+    tag: "Daily Habit",
+    actionTip: "Log today's completed lecture videos in the Daily Tracker before you sleep.",
+  },
+  {
+    quote: "One subject, one lecture, one problem at a time. The mountain seems high, but step by step you are already climbing faster than 99% of aspirants.",
+    author: "Unstoppable Momentum",
+    tag: "Focus",
+    actionTip: "Avoid multitasking. Dedicate full focus to your current lecture block.",
+  },
+];
+
 export interface WorkloadOverview {
   totalInitialVideos: number;
   totalRemainingVideos: number;
@@ -163,6 +227,9 @@ export interface WorkloadOverview {
   totalCompletedHours: number;
   overallCompletionPercentage: number;
   daysRemainingUntilDeadline: number;
+  daysRemainingUntilGateExam: number;
+  gateExamDate: string;
+  motivation: GateMotivation;
   effectiveStudyDays: number;
   totalAvailableStudyHours: number;
   dailyRequiredLectureHours: number;
@@ -182,6 +249,7 @@ export interface WorkloadOverview {
 export function calculateGateWorkload(params: {
   subjects: any[];
   deadline?: Date;
+  gateExamDate?: Date;
   dailyStudyHours?: number;
   studyDaysPerWeek?: number;
   playbackSpeed?: number;
@@ -190,6 +258,7 @@ export function calculateGateWorkload(params: {
   const {
     subjects,
     deadline = new Date("2026-12-31T23:59:59.999Z"),
+    gateExamDate = new Date("2027-02-06T09:00:00.000Z"),
     dailyStudyHours = 10,
     studyDaysPerWeek = 6,
     playbackSpeed = 1.0,
@@ -317,6 +386,16 @@ export function calculateGateWorkload(params: {
     s.estimatedCompletionDate = testDate.toISOString().split("T")[0];
   }
 
+  // Calculate days until GATE Exam
+  const examDate = new Date(gateExamDate);
+  examDate.setHours(23, 59, 59, 999);
+  const daysRemainingUntilGateExam = Math.max(0, Math.ceil((examDate.getTime() - now.getTime()) / msPerDay));
+
+  // Daily motivation calculation (rotates daily based on day of year)
+  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / msPerDay);
+  const motivationIndex = Math.abs(dayOfYear) % GATE_MOTIVATION_QUOTES.length;
+  const motivation = GATE_MOTIVATION_QUOTES[motivationIndex];
+
   return {
     totalInitialVideos,
     totalRemainingVideos,
@@ -325,6 +404,9 @@ export function calculateGateWorkload(params: {
     totalCompletedHours: Number(totalCompletedHours.toFixed(2)),
     overallCompletionPercentage,
     daysRemainingUntilDeadline: daysDiff,
+    daysRemainingUntilGateExam,
+    gateExamDate: examDate.toISOString().split("T")[0],
+    motivation,
     effectiveStudyDays,
     totalAvailableStudyHours,
     dailyRequiredLectureHours,
