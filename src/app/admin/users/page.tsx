@@ -21,6 +21,9 @@ import {
   Sparkles,
   ChevronRight,
   Filter,
+  Trash2,
+  Send,
+  AlertOctagon,
 } from "lucide-react";
 
 export default function AdminUsersPage() {
@@ -39,6 +42,9 @@ export default function AdminUsersPage() {
   const [rejectModalUser, setRejectModalUser] = useState<any | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Permanent Delete modal state
+  const [deleteModalUser, setDeleteModalUser] = useState<any | null>(null);
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -51,6 +57,14 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
+      // 1. Strictly verify that the logged-in user is Hari (chenthilhari@gmail.com)
+      const meRes = await fetch("/api/auth/me");
+      const meData = await meRes.json();
+      if (!meData.success || meData.user?.email?.toLowerCase() !== "chenthilhari@gmail.com") {
+        router.push("/dashboard");
+        return;
+      }
+
       const res = await fetch("/api/admin/users");
       if (res.status === 403 || res.status === 401) {
         // Not admin, redirect to dashboard
@@ -73,7 +87,11 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleAction = async (userId: string, action: "approve" | "reject", reason?: string) => {
+  const handleAction = async (
+    userId: string,
+    action: "approve" | "reject" | "resend-invite" | "delete",
+    reason?: string
+  ) => {
     setActionLoadingId(userId);
     try {
       const res = await fetch("/api/admin/users/action", {
@@ -84,10 +102,16 @@ export default function AdminUsersPage() {
       const data = await res.json();
 
       if (data.success) {
-        showToast(data.message || `User ${action === "approve" ? "approved" : "rejected"} successfully!`);
+        showToast(
+          data.message ||
+            `Action ${action} processed successfully!`
+        );
         if (action === "reject") {
           setRejectModalUser(null);
           setRejectionReason("");
+        }
+        if (action === "delete") {
+          setDeleteModalUser(null);
         }
         await fetchUsers();
       } else {
@@ -394,48 +418,74 @@ export default function AdminUsersPage() {
                     </div>
 
                     {/* Action buttons */}
-                    {applicant.status === "pending" && (
-                      <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {applicant.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleAction(applicant._id, "approve")}
+                            disabled={isActionLoading}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm shadow-emerald-500/30 hover:bg-emerald-700 transition-all disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>Approve & Email</span>
+                          </button>
+                          <button
+                            onClick={() => setRejectModalUser(applicant)}
+                            disabled={isActionLoading}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                            <span>Deny</span>
+                          </button>
+                        </>
+                      )}
+
+                      {applicant.status === "approved" && applicant.email !== "chenthilhari@gmail.com" && (
+                        <>
+                          <button
+                            onClick={() => handleAction(applicant._id, "resend-invite")}
+                            disabled={isActionLoading}
+                            title="Resend activation & login email"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            <span>Resend Login Email</span>
+                          </button>
+                          <button
+                            onClick={() => setRejectModalUser(applicant)}
+                            disabled={isActionLoading}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                          >
+                            <UserX className="h-3.5 w-3.5" />
+                            <span>Revoke Access</span>
+                          </button>
+                        </>
+                      )}
+
+                      {applicant.status === "rejected" && (
                         <button
                           onClick={() => handleAction(applicant._id, "approve")}
                           disabled={isActionLoading}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-500/30 hover:bg-emerald-700 transition-all disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600/90 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
                         >
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>Approve & Email</span>
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Re-Approve Access</span>
                         </button>
+                      )}
+
+                      {/* Permanent User & Data Delete Button (for all non-Hari accounts) */}
+                      {applicant.email !== "chenthilhari@gmail.com" && (
                         <button
-                          onClick={() => setRejectModalUser(applicant)}
+                          onClick={() => setDeleteModalUser(applicant)}
                           disabled={isActionLoading}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+                          title="Permanently wipe user and all data from database"
+                          className="inline-flex items-center gap-1 rounded-xl border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                         >
-                          <XCircle className="h-4 w-4" />
-                          <span>Deny</span>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete Account</span>
                         </button>
-                      </div>
-                    )}
-
-                    {applicant.status === "approved" && applicant.email !== "chenthilhari@gmail.com" && (
-                      <button
-                        onClick={() => setRejectModalUser(applicant)}
-                        disabled={isActionLoading}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 px-3 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 transition-colors"
-                      >
-                        <UserX className="h-3.5 w-3.5" />
-                        <span>Revoke Access</span>
-                      </button>
-                    )}
-
-                    {applicant.status === "rejected" && (
-                      <button
-                        onClick={() => handleAction(applicant._id, "approve")}
-                        disabled={isActionLoading}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600/90 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>Re-Approve Access</span>
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </div>
 
                   {/* Stated Reason for wanting an account */}
@@ -516,6 +566,66 @@ export default function AdminUsersPage() {
                   className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 transition-colors disabled:opacity-50"
                 >
                   {actionLoadingId === rejectModalUser._id ? "Processing..." : "Confirm Denial & Send Email"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Permanent Account & Data Deletion Modal */}
+        {deleteModalUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md rounded-3xl border border-red-500/30 bg-card p-6 shadow-2xl space-y-4">
+              <div className="flex items-center gap-3 text-red-500">
+                <div className="p-2.5 rounded-2xl bg-red-500/10 border border-red-500/20">
+                  <AlertOctagon className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-foreground">
+                    Permanent Account Deletion
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {deleteModalUser.name} &middot; {deleteModalUser.email}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-3.5 space-y-2 text-xs text-red-400">
+                <div className="font-bold flex items-center gap-1.5 text-red-500">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>This action is permanent and cannot be reversed!</span>
+                </div>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  Deleting this user will completely and permanently purge all their records across the database:
+                </p>
+                <ul className="list-disc pl-4 space-y-1 text-[11px] text-muted-foreground">
+                  <li>User account, authentication, and credentials</li>
+                  <li>All attendance logs, history, and audit trails</li>
+                  <li>All timetable slots and scheduled class sessions</li>
+                  <li>All enrolled subjects and uploaded documents</li>
+                  <li>All GATE 2027 planner data, pyq records, and study sessions</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalUser(null)}
+                  disabled={actionLoadingId === deleteModalUser._id}
+                  className="rounded-xl border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleAction(deleteModalUser._id, "delete")
+                  }
+                  disabled={actionLoadingId === deleteModalUser._id}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-600/30 hover:bg-red-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>{actionLoadingId === deleteModalUser._id ? "Purging Data..." : "Permanently Delete User"}</span>
                 </button>
               </div>
             </div>

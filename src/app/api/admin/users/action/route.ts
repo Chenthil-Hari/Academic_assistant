@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { authenticateRequest } from "@/lib/auth/middleware-utils";
 import connectToDatabase from "@/lib/db/connection";
-import { User } from "@/lib/db/models/User";
+import {
+  User,
+  Subject,
+  Timetable,
+  AcademicEvent,
+  ClassSession,
+  Attendance,
+  UploadedDocument,
+  Conversation,
+  Notification,
+  AuditLog,
+  GateSubject,
+  GateUserSettings,
+  GateStudySession,
+  GateProgress,
+  GatePYQProgress,
+  GateMistake,
+  GateWeeklyReport,
+} from "@/lib/db/models";
 import {
   sendRegistrationApprovedEmail,
   sendRegistrationRejectedEmail,
@@ -16,12 +35,8 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Verify admin
-    const adminUser = await User.findById(user.userId);
-    const isAdmin =
-      user.email === "chenthilhari@gmail.com" ||
-      adminUser?.role === "admin" ||
-      adminUser?.email === "chenthilhari@gmail.com";
+    // Verify admin: strictly restricted to Hari's login
+    const isAdmin = user.email?.toLowerCase() === "chenthilhari@gmail.com";
 
     if (!isAdmin) {
       return NextResponse.json(
@@ -33,9 +48,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { userId, action, rejectionReason } = body;
 
-    if (!userId || !action || !["approve", "reject"].includes(action)) {
+    if (!userId || !action || !["approve", "reject", "resend-invite", "delete"].includes(action)) {
       return NextResponse.json(
-        { success: false, message: "Valid userId and action ('approve' or 'reject') are required." },
+        { success: false, message: "Valid userId and action ('approve', 'reject', 'resend-invite', or 'delete') are required." },
         { status: 400 }
       );
     }
@@ -51,7 +66,7 @@ export async function POST(req: NextRequest) {
     if (action === "approve") {
       targetUser.status = "approved";
       targetUser.approvedAt = new Date();
-      targetUser.approvedBy = adminUser?._id;
+      targetUser.approvedBy = new mongoose.Types.ObjectId(user.userId);
       targetUser.rejectionReason = "";
       await targetUser.save();
 
@@ -71,6 +86,21 @@ export async function POST(req: NextRequest) {
           status: targetUser.status,
           approvedAt: targetUser.approvedAt,
         },
+        emailDelivered: emailResult.success,
+      });
+    }
+
+    if (action === "resend-invite") {
+      const emailResult = await sendRegistrationApprovedEmail(
+        targetUser.email,
+        targetUser.name
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: emailResult.success
+          ? `Activation email resent successfully to ${targetUser.email}!`
+          : `Failed to resend activation email: ${emailResult.error}`,
         emailDelivered: emailResult.success,
       });
     }
@@ -100,6 +130,46 @@ export async function POST(req: NextRequest) {
           rejectionReason: targetUser.rejectionReason,
         },
         emailDelivered: emailResult.success,
+      });
+    }
+
+    if (action === "delete") {
+      if (targetUser.email?.toLowerCase() === "chenthilhari@gmail.com") {
+        return NextResponse.json(
+          { success: false, message: "Cannot delete the root administrator account." },
+          { status: 400 }
+        );
+      }
+
+      const targetId = targetUser._id;
+      const targetName = targetUser.name;
+      const targetEmail = targetUser.email;
+
+      // Permanently and fully delete user and ALL related data across all 17 collections
+      await Promise.all([
+        User.deleteOne({ _id: targetId }),
+        Attendance.deleteMany({ userId: targetId }),
+        ClassSession.deleteMany({ userId: targetId }),
+        Timetable.deleteMany({ userId: targetId }),
+        Subject.deleteMany({ userId: targetId }),
+        AcademicEvent.deleteMany({ userId: targetId }),
+        UploadedDocument.deleteMany({ userId: targetId }),
+        Conversation.deleteMany({ userId: targetId }),
+        Notification.deleteMany({ userId: targetId }),
+        AuditLog.deleteMany({ userId: targetId }),
+        GateSubject.deleteMany({ userId: targetId }),
+        GateUserSettings.deleteMany({ userId: targetId }),
+        GateStudySession.deleteMany({ userId: targetId }),
+        GateProgress.deleteMany({ userId: targetId }),
+        GatePYQProgress.deleteMany({ userId: targetId }),
+        GateMistake.deleteMany({ userId: targetId }),
+        GateWeeklyReport.deleteMany({ userId: targetId }),
+      ]);
+
+      return NextResponse.json({
+        success: true,
+        message: `User ${targetName} (${targetEmail}) and all their academic, attendance, timetable, and planner data have been permanently deleted from the database.`,
+        deletedUserId: targetId,
       });
     }
 

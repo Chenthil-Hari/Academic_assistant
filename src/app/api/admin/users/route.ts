@@ -12,12 +12,8 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Verify admin privileges
-    const adminUser = await User.findById(user.userId);
-    const isAdmin =
-      user.email === "chenthilhari@gmail.com" ||
-      adminUser?.role === "admin" ||
-      adminUser?.email === "chenthilhari@gmail.com";
+    // Verify admin privileges: strictly restricted to Hari's login
+    const isAdmin = user.email?.toLowerCase() === "chenthilhari@gmail.com";
 
     if (!isAdmin) {
       return NextResponse.json(

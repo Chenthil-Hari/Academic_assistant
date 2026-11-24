@@ -50,8 +50,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       const res = await fetch("/api/auth/me");
       const data = await res.json();
       if (data.success && data.user) {
+        // Admin panel is strictly reserved for Hari's login
         const adminStatus =
-          data.user.email === "chenthilhari@gmail.com" || data.user.role === "admin";
+          data.user.email?.toLowerCase() === "chenthilhari@gmail.com";
         setIsAdmin(adminStatus);
         if (adminStatus) {
           // Fetch pending requests count
