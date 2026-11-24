@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
   GraduationCap,
   Target,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,34 @@ const NAV_ITEMS = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    checkAdmin();
+  }, []);
+
+  const checkAdmin = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (data.success && data.user) {
+        const adminStatus =
+          data.user.email === "chenthilhari@gmail.com" || data.user.role === "admin";
+        setIsAdmin(adminStatus);
+        if (adminStatus) {
+          // Fetch pending requests count
+          const adminRes = await fetch("/api/admin/users");
+          const adminData = await adminRes.json();
+          if (adminData.success && adminData.counts) {
+            setPendingCount(adminData.counts.pending || 0);
+          }
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
 
   return (
     <>
@@ -125,6 +154,43 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </Link>
             );
           })}
+
+          {/* Admin Control Link (Only visible to admin) */}
+          {isAdmin && (
+            <div className="pt-3">
+              <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500 flex items-center justify-between">
+                <span>Admin Control</span>
+                <ShieldCheck className="h-3 w-3 text-amber-500" />
+              </div>
+              <Link
+                href="/admin/users"
+                onClick={onClose}
+                className={cn(
+                  "group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
+                  pathname.startsWith("/admin")
+                    ? "bg-amber-500 text-white shadow-sm shadow-amber-500/25 font-semibold"
+                    : "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldCheck
+                    className={cn(
+                      "h-4 w-4 transition-transform group-hover:scale-110",
+                      pathname.startsWith("/admin")
+                        ? "text-white"
+                        : "text-amber-500"
+                    )}
+                  />
+                  <span>User Requests</span>
+                </div>
+                {pendingCount > 0 && (
+                  <span className="rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-300 px-2 py-0.5 text-[10px] font-black">
+                    {pendingCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* 4 PM Check-in Banner in Sidebar */}

@@ -25,6 +25,13 @@ export interface IUser extends Document {
   telegramChatId?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  role: "admin" | "student";
+  status: "pending" | "approved" | "rejected";
+  signupReason?: string;
+  rejectionReason?: string;
+  approvedAt?: Date;
+  rejectedAt?: Date;
+  approvedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -98,6 +105,38 @@ const UserSchema = new Schema<IUser>(
     },
     resetPasswordExpires: {
       type: Date,
+    },
+    role: {
+      type: String,
+      enum: ["admin", "student"],
+      default: "student",
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+    signupReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    rejectionReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectedAt: {
+      type: Date,
+    },
+    approvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
   },
   {

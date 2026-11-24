@@ -11,11 +11,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isPending, setIsPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsPending(false);
     setLoading(true);
 
     try {
@@ -27,6 +29,9 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        if (data.pendingApproval) {
+          setIsPending(true);
+        }
         throw new Error(data.message || "Invalid credentials.");
       }
 
@@ -55,9 +60,18 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="flex items-center gap-2.5 rounded-2xl bg-destructive/10 p-3.5 text-xs text-destructive border border-destructive/20">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+          <div
+            className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-xs border ${
+              isPending
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                : "bg-destructive/10 text-destructive border-destructive/20"
+            }`}
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-semibold block">{isPending ? "Awaiting Admin Approval" : "Sign In Error"}</span>
+              <span className="block leading-relaxed">{error}</span>
+            </div>
           </div>
         )}
 

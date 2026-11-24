@@ -3,7 +3,22 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GraduationCap, ArrowRight, Lock, Mail, User, School, AlertCircle, Eye, EyeOff } from "lucide-react";
+import {
+  GraduationCap,
+  ArrowRight,
+  Lock,
+  Mail,
+  User,
+  School,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+  Quote,
+  ShieldCheck,
+} from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -14,13 +29,18 @@ export default function SignupPage() {
     college: "",
     branch: "",
     semester: 3,
+    rollNumber: "",
     targetAttendancePercentage: 75,
+    signupReason: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [submittedForReview, setSubmittedForReview] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -41,14 +61,91 @@ export default function SignupPage() {
         throw new Error(data.message || "Signup failed.");
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      if (data.pendingApproval) {
+        setSubmittedForReview(true);
+      } else {
+        // Admin or direct account
+        router.push("/dashboard");
+        router.refresh();
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to create account.");
+      setError(err.message || "Failed to submit registration request.");
     } finally {
       setLoading(false);
     }
   };
+
+  // If application was submitted for admin approval
+  if (submittedForReview) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-3 sm:p-4 bg-gradient-to-b from-background via-card to-background">
+        <div className="w-full max-w-lg space-y-6 rounded-3xl border bg-card/80 p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30">
+            <Clock className="h-8 w-8 animate-pulse" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-500 border border-amber-500/20">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Application Under Review
+            </span>
+            <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+              Registration Request Received!
+            </h1>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Thank you, <strong>{formData.name}</strong>. Your account registration request has been submitted to administrator Hari for review.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border bg-background/80 p-5 text-left space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <span>Submitted Application Summary</span>
+              <span className="text-amber-500">Pending Approval</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground block">Email:</span>
+                <span className="font-semibold text-foreground truncate block">{formData.email}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block">College:</span>
+                <span className="font-semibold text-foreground truncate block">{formData.college || "N/A"}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block">Branch & Sem:</span>
+                <span className="font-semibold text-foreground truncate block">
+                  {formData.branch || "General"} &middot; Sem {formData.semester}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block">Roll Number:</span>
+                <span className="font-semibold text-foreground">{formData.rollNumber || "N/A"}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t text-xs">
+              <span className="text-muted-foreground block mb-1">Your Stated Reason:</span>
+              <p className="italic text-foreground/90 bg-muted/40 p-2.5 rounded-xl border">
+                &ldquo;{formData.signupReason}&rdquo;
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 text-xs text-muted-foreground leading-relaxed">
+            📧 An automated notification has been sent from <strong>noreply@hari07.tech</strong> to Hari. Once approved, you will receive an activation email at <strong>{formData.email}</strong> allowing you to sign in.
+          </div>
+
+          <Link
+            href="/auth/login"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all"
+          >
+            <span>Back to Sign In</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-3 sm:p-4 bg-gradient-to-b from-background via-card to-background">
@@ -58,10 +155,10 @@ export default function SignupPage() {
             <GraduationCap className="h-8 w-8" />
           </div>
           <h1 className="mt-4 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-            Create Your Account
+            Request an Account
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Get started with Academic AI smart management
+            Academic AI &middot; Private Student Management Operating System
           </p>
         </div>
 
@@ -131,22 +228,29 @@ export default function SignupPage() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {/* Password strength indicator */}
             {formData.password.length > 0 && (
               <div className="space-y-1">
                 <div className="flex gap-1">
                   {[1, 2, 3, 4].map((level) => {
-                    const strength = formData.password.length >= 12 ? 4
-                      : formData.password.length >= 8 ? 3
-                      : formData.password.length >= 6 ? 2 : 1;
+                    const strength =
+                      formData.password.length >= 12
+                        ? 4
+                        : formData.password.length >= 8
+                        ? 3
+                        : formData.password.length >= 6
+                        ? 2
+                        : 1;
                     return (
                       <div
                         key={level}
                         className={`h-1 flex-1 rounded-full transition-all ${
                           level <= strength
-                            ? strength === 1 ? "bg-red-500"
-                              : strength === 2 ? "bg-amber-500"
-                              : strength === 3 ? "bg-blue-500"
+                            ? strength === 1
+                              ? "bg-red-500"
+                              : strength === 2
+                              ? "bg-amber-500"
+                              : strength === 3
+                              ? "bg-blue-500"
                               : "bg-emerald-500"
                             : "bg-muted"
                         }`}
@@ -154,24 +258,19 @@ export default function SignupPage() {
                     );
                   })}
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                  {formData.password.length < 6 ? "Too short"
-                    : formData.password.length < 8 ? "Fair – try longer"
-                    : formData.password.length < 12 ? "Good"
-                    : "Strong"}
-                </p>
               </div>
             )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">College / University</label>
+              <label className="text-xs font-semibold text-foreground">College / University *</label>
               <div className="relative">
                 <School className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
                 <input
                   type="text"
                   name="college"
+                  required
                   value={formData.college}
                   onChange={handleChange}
                   placeholder="e.g. National Institute of Tech"
@@ -181,13 +280,14 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">Branch / Major</label>
+              <label className="text-xs font-semibold text-foreground">Branch / Major *</label>
               <input
                 type="text"
                 name="branch"
+                required
                 value={formData.branch}
                 onChange={handleChange}
-                placeholder="e.g. Computer Science"
+                placeholder="e.g. Computer Science & Engg"
                 className="w-full rounded-xl border bg-background/80 py-2.5 px-4 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -211,19 +311,36 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">
-                Target Attendance %
-              </label>
+              <label className="text-xs font-semibold text-foreground">Roll Number / ID</label>
               <input
-                type="number"
-                name="targetAttendancePercentage"
-                min={50}
-                max={100}
-                value={formData.targetAttendancePercentage}
+                type="text"
+                name="rollNumber"
+                value={formData.rollNumber}
                 onChange={handleChange}
+                placeholder="e.g. 21CS042"
                 className="w-full rounded-xl border bg-background/80 py-2.5 px-4 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
+          </div>
+
+          {/* Stated Reason for wanting an account */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+              <span>Why do you want to create an account? *</span>
+              <span className="text-[11px] text-muted-foreground font-normal">Required for approval</span>
+            </label>
+            <textarea
+              name="signupReason"
+              required
+              rows={3}
+              value={formData.signupReason}
+              onChange={handleChange}
+              placeholder="Explain why you want to use Academic AI, your academic goals, and why the admin should approve your account..."
+              className="w-full rounded-xl border bg-background/80 p-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Administrator Hari will review your reason and grant access via email from <strong>noreply@hari07.tech</strong>.
+            </p>
           </div>
 
           <button
@@ -235,7 +352,7 @@ export default function SignupPage() {
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
             ) : (
               <>
-                <span>Complete Registration</span>
+                <span>Submit Account Request</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

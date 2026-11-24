@@ -33,6 +33,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isAdmin = user.email === "chenthilhari@gmail.com";
+    const userRole = user.role || (isAdmin ? "admin" : "student");
+    const userStatus = user.status || (isAdmin ? "approved" : "approved");
+
+    // Guard: Check approval status for non-admin accounts
+    if (!isAdmin) {
+      if (userStatus === "pending") {
+        return NextResponse.json(
+          {
+            success: false,
+            pendingApproval: true,
+            message:
+              "Your account registration request is awaiting administrator approval. You will receive an email once your account has been reviewed.",
+          },
+          { status: 403 }
+        );
+      }
+
+      if (userStatus === "rejected") {
+        return NextResponse.json(
+          {
+            success: false,
+            rejected: true,
+            message: user.rejectionReason
+              ? `Your account request was not approved. Note: ${user.rejectionReason}`
+              : "Your account registration request was not approved by the administrator.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const token = signToken({
       userId: user._id.toString(),
       email: user.email,
@@ -46,6 +78,8 @@ export async function POST(req: NextRequest) {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: userRole,
+        status: userStatus,
         college: user.college,
         branch: user.branch,
         semester: user.semester,
