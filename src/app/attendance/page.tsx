@@ -49,7 +49,15 @@ export default function AttendancePage() {
 
   // Form states
   const [newSubject, setNewSubject] = useState({ code: "", name: "", credit: 3, minAttendanceThreshold: 75 });
-  const [newRecord, setNewRecord] = useState({ subjectId: "", date: new Date().toISOString().split("T")[0], status: "Attended", notes: "" });
+  const [newRecord, setNewRecord] = useState({
+    subjectId: "",
+    date: new Date().toISOString().split("T")[0],
+    status: "Attended",
+    classCategory: "Regular",
+    periods: 1,
+    periodSlot: "",
+    notes: "",
+  });
   const [editForm, setEditForm] = useState({ status: "Attended", notes: "", reason: "" });
 
   useEffect(() => {
@@ -126,7 +134,15 @@ export default function AttendancePage() {
       const data = await res.json();
       if (data.success) {
         setShowAddRecordModal(false);
-        setNewRecord({ subjectId: "", date: new Date().toISOString().split("T")[0], status: "Attended", notes: "" });
+        setNewRecord({
+          subjectId: "",
+          date: new Date().toISOString().split("T")[0],
+          status: "Attended",
+          classCategory: "Regular",
+          periods: 1,
+          periodSlot: "",
+          notes: "",
+        });
         loadData();
       } else {
         alert(data.message || "Failed to save attendance.");
@@ -543,12 +559,26 @@ export default function AttendancePage() {
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {r.source === "daily_checkin"
-                          ? "4 PM Check-in"
-                          : r.source === "ai_assistant"
-                          ? "AI Assistant"
-                          : "Manual"}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {r.notes?.includes("[Interchanged") ? (
+                          <span className="rounded-md bg-purple-500/10 text-purple-400 font-bold px-2 py-0.5 text-[10px] border border-purple-500/20">
+                            Interchanged
+                          </span>
+                        ) : r.notes?.includes("[Extra") ? (
+                          <span className="rounded-md bg-blue-500/10 text-blue-400 font-bold px-2 py-0.5 text-[10px] border border-blue-500/20">
+                            Extra Class
+                          </span>
+                        ) : r.notes?.includes("[Lab") ? (
+                          <span className="rounded-md bg-cyan-500/10 text-cyan-400 font-bold px-2 py-0.5 text-[10px] border border-cyan-500/20">
+                            Lab Session
+                          </span>
+                        ) : r.source === "daily_checkin" ? (
+                          <span className="text-muted-foreground text-xs">4 PM Check-in</span>
+                        ) : r.source === "ai_assistant" ? (
+                          <span className="text-muted-foreground text-xs">AI Assistant</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Manual</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
                         {r.notes || "—"}
@@ -965,10 +995,15 @@ export default function AttendancePage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-3xl border bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b">
-                <h3 className="font-bold text-base text-foreground">Record Attendance</h3>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">Record Attendance</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Mark attendance for any subject on any day irrespective of timetable (substitutions, interchanges, extra classes).
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowAddRecordModal(false)}
-                  className="rounded-lg p-1 text-muted-foreground hover:bg-muted"
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-muted shrink-0"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -983,7 +1018,7 @@ export default function AttendancePage() {
                     onChange={(e) => setNewRecord({ ...newRecord, subjectId: e.target.value })}
                     className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
                   >
-                    <option value="">-- Choose Subject --</option>
+                    <option value="">-- Choose Subject (Any Registered Subject) --</option>
                     {subjects.map((s) => (
                       <option key={s._id} value={s._id}>
                         {s.code} - {s.name}
@@ -1019,13 +1054,68 @@ export default function AttendancePage() {
                   </div>
                 </div>
 
+                {/* Class Nature / Interchange Reason */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-foreground">Class Nature / Type</label>
+                  <select
+                    value={newRecord.classCategory}
+                    onChange={(e) => setNewRecord({ ...newRecord, classCategory: e.target.value })}
+                    className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                  >
+                    <option value="Regular">Regular Lecture</option>
+                    <option value="Interchanged">🔄 Interchanged / Proxy Class (Faculty Absent)</option>
+                    <option value="ExtraClass">⚡ Extra / Makeup Class</option>
+                    <option value="Lab">🧪 Lab / Practical Session</option>
+                  </select>
+                </div>
+
+                {/* Number of periods & Period Slot */}
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground">Number of Periods</label>
+                    <select
+                      value={newRecord.periods}
+                      onChange={(e) => setNewRecord({ ...newRecord, periods: Number(e.target.value) })}
+                      className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                    >
+                      <option value={1}>1 Period</option>
+                      <option value={2}>2 Periods (Double Session)</option>
+                      <option value={3}>3 Periods (Block Session)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground">Period Slot (Optional)</label>
+                    <select
+                      value={newRecord.periodSlot}
+                      onChange={(e) => setNewRecord({ ...newRecord, periodSlot: e.target.value })}
+                      className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+                    >
+                      <option value="">-- Any / Unspecified --</option>
+                      <option value="08:25 - 09:15">Period 1 (08:25 - 09:15)</option>
+                      <option value="09:15 - 10:05">Period 2 (09:15 - 10:05)</option>
+                      <option value="10:20 - 11:10">Period 3 (10:20 - 11:10)</option>
+                      <option value="11:10 - 12:00">Period 4 (11:10 - 12:00)</option>
+                      <option value="12:50 - 13:40">Period 5 (12:50 - 13:40)</option>
+                      <option value="13:40 - 14:30">Period 6 (13:40 - 14:30)</option>
+                      <option value="14:40 - 15:20">Period 7 (14:40 - 15:20)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {newRecord.classCategory === "Interchanged" && (
+                  <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-2.5 text-[11px] text-purple-300">
+                    💡 <strong>Interchanged Period:</strong> This attendance will be accurately counted towards {subjects.find(s => s._id === newRecord.subjectId)?.code || "this subject"} irrespective of your regular weekly timetable.
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="font-semibold text-foreground">Notes (optional)</label>
                   <input
                     type="text"
                     value={newRecord.notes}
                     onChange={(e) => setNewRecord({ ...newRecord, notes: e.target.value })}
-                    placeholder="e.g. Extra class held on Saturday"
+                    placeholder="e.g. Substituted for Compiler Design due to faculty on leave"
                     className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
                   />
                 </div>

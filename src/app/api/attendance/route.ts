@@ -3,6 +3,7 @@ import { authenticateRequest } from "@/lib/auth/middleware-utils";
 import connectToDatabase from "@/lib/db/connection";
 import { Attendance } from "@/lib/db/models/Attendance";
 import { Subject } from "@/lib/db/models/Subject";
+import { ClassSession } from "@/lib/db/models/ClassSession";
 import { createAuditLog } from "@/lib/db/audit";
 import { normalizeDate } from "@/lib/attendance/session-generator";
 
@@ -54,14 +55,23 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/attendance - Manually mark single attendance or extra class session
+// POST /api/attendance - Manually mark single or multi-period attendance, including interchanged/proxy classes
 export async function POST(req: NextRequest) {
   try {
     const { user, errorResponse } = await authenticateRequest(req);
     if (errorResponse || !user) return errorResponse;
 
     const body = await req.json();
-    const { subjectId, date, status, notes, classSessionId } = body;
+    const {
+      subjectId,
+      date,
+      status,
+      notes,
+      classSessionId,
+      periods = 1,
+      classCategory = "Regular",
+      periodSlot = "",
+    } = body;
 
     if (!subjectId || !date || !status) {
       return NextResponse.json(
@@ -78,58 +88,135 @@ export async function POST(req: NextRequest) {
     }
 
     const targetDate = normalizeDate(new Date(date));
+    const numPeriods = Math.max(1, Math.min(Number(periods || 1), 6));
 
-    // Prevent double counting: check existing record
-    const filter: any = {
-      userId: user.userId,
-      subjectId,
-      date: targetDate,
-    };
+    let finalNote = notes ? notes.trim() : "";
+    if (classCategory === "Interchanged" && !finalNote.toLowerCase().includes("interchanged")) {
+      finalNote = `[Interchanged Period] ${finalNote}`.trim();
+    } else if (classCategory === "ExtraClass" && !finalNote.toLowerCase().includes("extra")) {
+      finalNote = `[Extra Class] ${finalNote}`.trim();
+    } else if (classCategory === "Lab" && !finalNote.toLowerCase().includes("lab")) {
+      finalNote = `[Lab Session] ${finalNote}`.trim();
+    }
+
+    // Standard bell slots for helper start/end times if not specified
+    const standardSlots = [
+      { start: "08:25", end: "09:15" },
+      { start: "09:15", end: "10:05" },
+      { start: "10:20", end: "11:10" },
+      { start: "11:10", end: "12:00" },
+      { start: "12:50", end: "13:40" },
+      { start: "13:40", end: "14:30" },
+      { start: "14:40", end: "15:20" },
+    ];
+
+    const createdRecords = [];
+
+    // Case 1: Updating an existing specific class session
     if (classSessionId) {
-      filter.classSessionId = classSessionId;
-    }
-
-    let record = await Attendance.findOne(filter);
-    const previousStatus = record ? record.status : null;
-
-    if (record) {
-      record.status = status;
-      record.notes = notes || record.notes;
-      record.markedAt = new Date();
-      record.source = "manual";
-      await record.save();
-    } else {
-      record = await Attendance.create({
+      let record = await Attendance.findOne({
         userId: user.userId,
-        subjectId,
-        classSessionId: classSessionId || undefined,
-        date: targetDate,
-        status,
-        notes: notes || "",
-        source: "manual",
-        markedAt: new Date(),
+        classSessionId,
       });
+
+      const previousStatus = record ? record.status : null;
+      if (record) {
+        record.status = status;
+        record.notes = finalNote || record.notes;
+        record.markedAt = new Date();
+        record.source = "manual";
+        await record.save();
+      } else {
+        record = await Attendance.create({
+          userId: user.userId,
+          subjectId,
+          classSessionId,
+          date: targetDate,
+          status,
+          notes: finalNote,
+          source: "manual",
+          markedAt: new Date(),
+        });
+      }
+
+      await createAuditLog({
+        userId: user.userId,
+        action: previousStatus ? "ATTENDANCE_MANUAL_UPDATED" : "ATTENDANCE_MANUAL_CREATED",
+        entityType: "Attendance",
+        entityId: record._id,
+        previousData: { status: previousStatus },
+        newData: { status, notes: finalNote },
+        reason: classCategory === "Interchanged" ? "Faculty absent interchanged period" : "Manual entry by user",
+        ipAddress: req.headers.get("x-forwarded-for") || "",
+      });
+
+      createdRecords.push(record);
+    } else {
+      // Case 2: Marking 1 or more periods for ANY subject on ANY day irrespective of timetable
+      for (let i = 0; i < numPeriods; i++) {
+        let startTime = "";
+        let endTime = "";
+
+        if (periodSlot && periodSlot.includes("-")) {
+          const parts = periodSlot.split("-").map((s: string) => s.trim());
+          startTime = parts[0] || "";
+          endTime = parts[1] || "";
+        }
+
+        if (!startTime || i > 0) {
+          const slotIdx = Math.min(i, standardSlots.length - 1);
+          startTime = standardSlots[slotIdx].start;
+          endTime = standardSlots[slotIdx].end;
+        }
+
+        // Create a dedicated ClassSession for each marked period
+        const session = await ClassSession.create({
+          userId: user.userId,
+          subjectId: subject._id,
+          date: targetDate,
+          startTime,
+          endTime,
+          room: "",
+          type: classCategory === "ExtraClass" ? "ExtraClass" : classCategory === "Lab" ? "Lab" : "Lecture",
+          status: status === "Cancelled" ? "Cancelled" : "Conducted",
+          notes: finalNote,
+        });
+
+        // Create distinct Attendance record
+        const record = await Attendance.create({
+          userId: user.userId,
+          subjectId: subject._id,
+          classSessionId: session._id,
+          date: targetDate,
+          status,
+          notes: numPeriods > 1 ? `${finalNote} (Period ${i + 1}/${numPeriods})`.trim() : finalNote,
+          source: "manual",
+          markedAt: new Date(),
+        });
+
+        await createAuditLog({
+          userId: user.userId,
+          action: "ATTENDANCE_MANUAL_CREATED",
+          entityType: "Attendance",
+          entityId: record._id,
+          newData: { status, notes: record.notes, subject: subject.code },
+          reason: classCategory === "Interchanged" ? "Faculty absent interchanged period" : "Manual entry irrespective of timetable",
+          ipAddress: req.headers.get("x-forwarded-for") || "",
+        });
+
+        createdRecords.push(record);
+      }
     }
 
-    await createAuditLog({
-      userId: user.userId,
-      action: previousStatus ? "ATTENDANCE_MANUAL_UPDATED" : "ATTENDANCE_MANUAL_CREATED",
-      entityType: "Attendance",
-      entityId: record._id,
-      previousData: { status: previousStatus },
-      newData: { status, notes },
-      reason: "Manual entry by user",
-      ipAddress: req.headers.get("x-forwarded-for") || "",
-    });
-
-    const populated = await Attendance.findById(record._id)
+    const firstRecord = await Attendance.findById(createdRecords[0]._id)
       .populate("subjectId", "code name color")
       .populate("classSessionId", "startTime endTime room type");
 
     return NextResponse.json({
       success: true,
-      message: "Attendance recorded successfully.",
-      record: populated,
+      message: `Successfully marked ${createdRecords.length} period(s) of ${subject.code} as ${status} on ${targetDate.toISOString().split("T")[0]}.`,
+      record: firstRecord,
+      recordsCount: createdRecords.length,
     });
   } catch (error: any) {
     console.error("POST /api/attendance error:", error);
