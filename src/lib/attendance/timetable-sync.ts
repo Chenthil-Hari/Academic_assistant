@@ -1,0 +1,205 @@
+import connectToDatabase from "@/lib/db/connection";
+import { Timetable } from "@/lib/db/models/Timetable";
+import { ClassSession } from "@/lib/db/models/ClassSession";
+import { Attendance } from "@/lib/db/models/Attendance";
+import { createAuditLog } from "@/lib/db/audit";
+import { normalizeDate } from "@/lib/attendance/session-generator";
+import mongoose from "mongoose";
+
+export interface SyncResult {
+  date: string;
+  dayOfWeek: number;
+  addedSessions: number;
+  removedRecords: number;
+  updatedSessions: number;
+  details: string[];
+}
+
+/**
+ * Synchronizes ClassSessions and Attendance records with the user's active Timetable.
+ * - Adds missing sessions and pending attendance records for newly added slots.
+ * - Updates session times/rooms when slots change.
+ * - Removes unconfirmed or mismatched records when slots are removed or moved to other days.
+ * - If cleanOrphaned is true (or when syncing today's date), records for subjects NOT on that day's timetable are removed.
+ */
+export async function syncAttendanceWithTimetable(
+  userId: string | mongoose.Types.ObjectId,
+  targetDate: Date = new Date(),
+  options: { cleanOrphaned?: boolean; forceCleanSubjectId?: string } = {}
+): Promise<SyncResult> {
+  await connectToDatabase();
+
+  const userObjectId = new mongoose.Types.ObjectId(userId.toString());
+  const normalizedDate = normalizeDate(targetDate);
+  const dayOfWeek = normalizedDate.getDay();
+  const dateStr = normalizedDate.toISOString().split("T")[0];
+
+  const details: string[] = [];
+  let addedSessions = 0;
+  let removedRecords = 0;
+  let updatedSessions = 0;
+
+  // 1. Fetch user's active timetable slots for this dayOfWeek
+  const activeSlots = await Timetable.find({
+    userId: userObjectId,
+    dayOfWeek,
+    isActive: true,
+  }).populate("subjectId", "code name");
+
+  const activeSubjectIds = new Set(
+    activeSlots.map((s) => s.subjectId?._id ? s.subjectId._id.toString() : s.subjectId?.toString())
+  );
+
+  // 2. Fetch existing ClassSessions on this date
+  const existingSessions = await ClassSession.find({
+    userId: userObjectId,
+    date: normalizedDate,
+  });
+
+  // 3. Fetch existing Attendance records on this date
+  const existingAttendance = await Attendance.find({
+    userId: userObjectId,
+    date: normalizedDate,
+  }).populate("subjectId", "code name");
+
+  // 4. Identify orphaned / mismatched attendance records
+  // An attendance record is considered mismatched if:
+  // - Its subjectId is NOT in the active timetable for this dayOfWeek (and not explicitly marked as ExtraClass)
+  // - OR if forceCleanSubjectId is specified
+  for (const att of existingAttendance) {
+    const subId = att.subjectId?._id ? att.subjectId._id.toString() : att.subjectId?.toString();
+    const subCode = (att.subjectId as any)?.code || "Unknown";
+
+    const isExplicitExtra =
+      att.notes?.toLowerCase().includes("extra") ||
+      att.source === "ai_assistant" && activeSubjectIds.has(subId);
+
+    const isOrphaned =
+      !activeSubjectIds.has(subId) ||
+      (options.forceCleanSubjectId && options.forceCleanSubjectId === subId);
+
+    if (isOrphaned && (!isExplicitExtra || options.cleanOrphaned)) {
+      // Remove the orphaned attendance record
+      await Attendance.deleteOne({ _id: att._id });
+      removedRecords++;
+      details.push(`Removed out-of-sync attendance record for ${subCode} on ${dateStr} (not in today's timetable).`);
+
+      // Also remove associated ClassSession if any
+      if (att.classSessionId) {
+        await ClassSession.deleteOne({ _id: att.classSessionId });
+      }
+
+      await createAuditLog({
+        userId: userObjectId,
+        action: "ATTENDANCE_TIMETABLE_SYNC_REMOVED",
+        entityType: "Attendance",
+        entityId: att._id,
+        previousData: att.toObject(),
+        reason: `Removed during timetable synchronization: ${subCode} has no active slots on day ${dayOfWeek}`,
+      });
+    }
+  }
+
+  // 5. Clean up any remaining orphaned ClassSessions on this date
+  for (const session of existingSessions) {
+    const subId = session.subjectId?.toString();
+    if (!activeSubjectIds.has(subId) || (options.forceCleanSubjectId && options.forceCleanSubjectId === subId)) {
+      await ClassSession.deleteOne({ _id: session._id });
+      // Clean up any remaining attendance pointing to this session
+      const deletedAtt = await Attendance.deleteMany({ classSessionId: session._id });
+      if (deletedAtt.deletedCount > 0) {
+        removedRecords += deletedAtt.deletedCount;
+      }
+    }
+  }
+
+  // 6. Ensure all active slots have corresponding ClassSessions and Attendance records
+  for (const slot of activeSlots) {
+    if (!slot.subjectId) continue;
+    const subId = (slot.subjectId as any)._id || slot.subjectId;
+    const subCode = (slot.subjectId as any).code || "Subject";
+
+    let session = await ClassSession.findOne({
+      userId: userObjectId,
+      date: normalizedDate,
+      startTime: slot.timeSlot.startTime,
+    });
+
+    if (!session) {
+      // Create session for slot
+      session = await ClassSession.create({
+        userId: userObjectId,
+        subjectId: subId,
+        timetableSlotId: slot._id,
+        date: normalizedDate,
+        startTime: slot.timeSlot.startTime,
+        endTime: slot.timeSlot.endTime,
+        room: slot.room || "",
+        type: slot.type || "Lecture",
+        status: "Scheduled",
+      });
+      addedSessions++;
+      details.push(`Generated scheduled session for ${subCode} (${slot.timeSlot.startTime}-${slot.timeSlot.endTime})`);
+    } else {
+      // Update session if times or room changed
+      let changed = false;
+      if (session.endTime !== slot.timeSlot.endTime) {
+        session.endTime = slot.timeSlot.endTime;
+        changed = true;
+      }
+      if (session.room !== (slot.room || "")) {
+        session.room = slot.room || "";
+        changed = true;
+      }
+      if (session.subjectId?.toString() !== subId.toString()) {
+        session.subjectId = subId;
+        changed = true;
+      }
+      if (changed) {
+        await session.save();
+        updatedSessions++;
+      }
+    }
+
+    // Ensure Attendance record exists for this session
+    let attendance = await Attendance.findOne({
+      userId: userObjectId,
+      classSessionId: session._id,
+    });
+
+    if (!attendance) {
+      // Check if there is a manual record without classSessionId for this subject & date
+      const manualRecord = await Attendance.findOne({
+        userId: userObjectId,
+        subjectId: subId,
+        date: normalizedDate,
+        classSessionId: { $exists: false },
+      });
+
+      if (manualRecord) {
+        // Link it to the session
+        manualRecord.classSessionId = session._id;
+        await manualRecord.save();
+      } else {
+        await Attendance.create({
+          userId: userObjectId,
+          subjectId: subId,
+          classSessionId: session._id,
+          date: normalizedDate,
+          status: "Pending",
+          source: "daily_checkin",
+        });
+        details.push(`Created pending attendance check-in for ${subCode}`);
+      }
+    }
+  }
+
+  return {
+    date: dateStr,
+    dayOfWeek,
+    addedSessions,
+    removedRecords,
+    updatedSessions,
+    details,
+  };
+}

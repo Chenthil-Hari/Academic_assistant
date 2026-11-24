@@ -18,6 +18,7 @@ import {
   Check,
   X,
   ShieldAlert,
+  RefreshCw,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { ElectricBorder } from "@/components/ui/ElectricBorder";
@@ -147,6 +148,45 @@ export default function AttendancePage() {
       }
     } catch (err) {
       alert("Error deleting subject.");
+    }
+  };
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncTimetable = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/attendance/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cleanOrphaned: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "Attendance successfully synchronized with timetable!");
+        loadData();
+      } else {
+        alert(data.message || "Failed to sync attendance.");
+      }
+    } catch (err) {
+      alert("Error synchronizing with timetable.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this attendance record? This will update your attendance percentage and history.")) return;
+    try {
+      const res = await fetch(`/api/attendance/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        loadData();
+      } else {
+        alert(data.message || "Failed to delete record.");
+      }
+    } catch (err) {
+      alert("Error deleting record.");
     }
   };
 
@@ -434,6 +474,16 @@ export default function AttendancePage() {
                 <option value="Pending">Pending</option>
               </select>
 
+              <button
+                onClick={handleSyncTimetable}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                title="Synchronize records with active timetable (removes mismatched subjects)"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin text-primary" : ""}`} />
+                <span>{isSyncing ? "Syncing..." : "Sync Timetable"}</span>
+              </button>
+
               <a
                 href="/api/reports/export-csv?type=logs"
                 download
@@ -503,7 +553,7 @@ export default function AttendancePage() {
                       <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
                         {r.notes || "—"}
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
                         <button
                           onClick={() => {
                             setEditRecord(r);
@@ -517,6 +567,14 @@ export default function AttendancePage() {
                         >
                           <Edit2 className="h-3.5 w-3.5" />
                           <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(r._id)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+                          title="Delete Record"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete</span>
                         </button>
                       </td>
                     </tr>
@@ -719,20 +777,37 @@ export default function AttendancePage() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex items-center justify-between pt-2">
                   <button
                     type="button"
-                    onClick={() => setEditRecord(null)}
-                    className="rounded-xl border px-4 py-2 text-foreground hover:bg-muted font-semibold"
+                    onClick={() => {
+                      if (editRecord) {
+                        const id = editRecord._id;
+                        setEditRecord(null);
+                        handleDeleteRecord(id);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 px-3 py-2 text-red-500 hover:bg-red-500/10 font-semibold transition-colors"
                   >
-                    Cancel
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete Record</span>
                   </button>
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-primary px-4 py-2 text-primary-foreground font-semibold"
-                  >
-                    Save & Log Change
-                  </button>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditRecord(null)}
+                      className="rounded-xl border px-4 py-2 text-foreground hover:bg-muted font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-primary px-4 py-2 text-primary-foreground font-semibold"
+                    >
+                      Save & Log Change
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>

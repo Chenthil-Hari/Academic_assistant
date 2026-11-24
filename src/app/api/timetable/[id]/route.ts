@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/auth/middleware-utils";
 import connectToDatabase from "@/lib/db/connection";
 import { Timetable } from "@/lib/db/models/Timetable";
+import { syncAttendanceWithTimetable } from "@/lib/attendance/timetable-sync";
 
 export async function PUT(
   req: NextRequest,
@@ -21,6 +22,7 @@ export async function PUT(
       return NextResponse.json({ success: false, message: "Timetable slot not found." }, { status: 404 });
     }
 
+    const previousDayOfWeek = slot.dayOfWeek;
     if (subjectId) slot.subjectId = subjectId;
     if (dayOfWeek !== undefined) slot.dayOfWeek = Number(dayOfWeek);
     if (startTime) slot.timeSlot.startTime = startTime.trim();
@@ -30,6 +32,16 @@ export async function PUT(
     if (isActive !== undefined) slot.isActive = Boolean(isActive);
 
     await slot.save();
+
+    // Auto-sync attendance for today if affected by this slot change
+    const today = new Date();
+    if (today.getDay() === slot.dayOfWeek || today.getDay() === previousDayOfWeek) {
+      try {
+        await syncAttendanceWithTimetable(user.userId, today, { cleanOrphaned: true });
+      } catch (syncErr) {
+        console.warn("Auto-sync attendance failed on timetable PUT:", syncErr);
+      }
+    }
 
     const populated = await Timetable.findById(slot._id).populate(
       "subjectId",
@@ -60,6 +72,16 @@ export async function DELETE(
     const slot = await Timetable.findOneAndDelete({ _id: params.id, userId: user.userId });
     if (!slot) {
       return NextResponse.json({ success: false, message: "Timetable slot not found." }, { status: 404 });
+    }
+
+    // Auto-sync attendance for today if deleted slot was on today's weekday
+    const today = new Date();
+    if (today.getDay() === slot.dayOfWeek) {
+      try {
+        await syncAttendanceWithTimetable(user.userId, today, { cleanOrphaned: true });
+      } catch (syncErr) {
+        console.warn("Auto-sync attendance failed on timetable DELETE:", syncErr);
+      }
     }
 
     return NextResponse.json({

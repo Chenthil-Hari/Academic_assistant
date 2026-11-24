@@ -3,6 +3,7 @@ import { authenticateRequest } from "@/lib/auth/middleware-utils";
 import connectToDatabase from "@/lib/db/connection";
 import { Timetable } from "@/lib/db/models/Timetable";
 import { Subject } from "@/lib/db/models/Subject";
+import { syncAttendanceWithTimetable } from "@/lib/attendance/timetable-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,16 @@ export async function POST(req: NextRequest) {
       "subjectId",
       "code name color faculty"
     );
+
+    // Synchronize today's sessions if slot is added for today's weekday
+    const today = new Date();
+    if (today.getDay() === Number(dayOfWeek)) {
+      try {
+        await syncAttendanceWithTimetable(user.userId, today);
+      } catch (syncErr) {
+        console.warn("Auto-sync attendance failed on timetable add:", syncErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,

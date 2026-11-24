@@ -12,6 +12,7 @@ import {
   X,
   UploadCloud,
   CheckCircle,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { formatTime } from "@/lib/utils";
@@ -148,6 +149,29 @@ export default function TimetablePage() {
     }
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncAttendance = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/attendance/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cleanOrphaned: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "Attendance records successfully synchronized with timetable!");
+      } else {
+        alert(data.message || "Failed to sync attendance.");
+      }
+    } catch (err) {
+      alert("Error syncing attendance with timetable.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleDeleteSlot = async (id: string) => {
     if (!confirm("Remove this timetable slot?")) return;
     try {
@@ -206,6 +230,16 @@ export default function TimetablePage() {
               <UploadCloud className="h-4 w-4 text-primary" />
               <span>Import PDF</span>
             </Link>
+
+            <button
+              onClick={handleSyncAttendance}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 sm:px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all disabled:opacity-50"
+              title="Synchronize today's check-in sessions with current timetable"
+            >
+              <RefreshCw className={`h-4 w-4 text-primary ${isSyncing ? "animate-spin" : ""}`} />
+              <span>{isSyncing ? "Syncing..." : "Sync Attendance"}</span>
+            </button>
 
             <button
               onClick={() => setShowAddModal(true)}
