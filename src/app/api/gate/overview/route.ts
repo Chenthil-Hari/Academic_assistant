@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
         examLabel: isHari ? "GATE 2027" : "Exam 2027",
         targetYear: 2027,
         targetScore: 65,
+        studyStyle: isHari ? "videos" : "topics",
         dailyStudyHours: isHari ? 10 : 6,
         studyDaysPerWeek: 6,
         restDayOfWeek: 0,

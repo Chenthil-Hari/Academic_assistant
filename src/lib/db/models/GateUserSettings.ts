@@ -7,6 +7,7 @@ export interface IGateUserSettings extends Document {
   examLabel: string; // e.g. "GATE 2027" — shown in sidebar & UI
   targetYear: number; // e.g. 2027
   targetScore: number; // e.g. 65 (out of 100 for GATE)
+  studyStyle: "videos" | "chapters" | "topics" | "problems" | "hours"; // preparation style per user
   dailyStudyHours: number; // default: 10
   studyDaysPerWeek: number; // default: 6
   restDayOfWeek: number; // default: 0 (Sunday)
@@ -50,6 +51,11 @@ const GateUserSettingsSchema = new Schema<IGateUserSettings>(
       default: 65,
       min: 1,
       max: 100,
+    },
+    studyStyle: {
+      type: String,
+      enum: ["videos", "chapters", "topics", "problems", "hours"],
+      default: "videos",
     },
     dailyStudyHours: {
       type: Number,

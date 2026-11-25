@@ -52,7 +52,17 @@ export default function GatePlannerPage() {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showAddMistakeModal, setShowAddMistakeModal] = useState(false);
   const [showAddPYQModal, setShowAddPYQModal] = useState(false);
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
+
+  const [newSubjectForm, setNewSubjectForm] = useState({
+    name: "",
+    code: "",
+    remainingVideos: 20,
+    averageVideoDuration: 1.5,
+    priority: "High" as "High" | "Medium" | "Low",
+    color: "#3B82F6",
+  });
 
   // Form inputs
   const [logForm, setLogForm] = useState({
@@ -94,6 +104,7 @@ export default function GatePlannerPage() {
     examLabel: "GATE 2027",
     targetYear: 2027,
     targetScore: 65,
+    studyStyle: "videos" as "videos" | "chapters" | "topics" | "problems" | "hours",
     gateExamDate: "2027-02-06",
     phase1Deadline: "2026-12-31",
     dailyStudyHours: 10,
@@ -127,6 +138,7 @@ export default function GatePlannerPage() {
             examLabel: dataOverview.settings.examLabel || "GATE 2027",
             targetYear: dataOverview.settings.targetYear || 2027,
             targetScore: dataOverview.settings.targetScore || 65,
+            studyStyle: dataOverview.settings.studyStyle || "videos",
             gateExamDate: dataOverview.settings.gateExamDate
               ? new Date(dataOverview.settings.gateExamDate).toISOString().split("T")[0]
               : "2027-02-06",
@@ -211,6 +223,38 @@ export default function GatePlannerPage() {
       showNotification(err.message, "error");
     } finally {
       setSendingTelegram(false);
+    }
+  };
+
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/gate/subjects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newSubjectForm,
+          initialVideos: newSubjectForm.remainingVideos,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(`Added ${newSubjectForm.name}`);
+        setShowAddSubjectModal(false);
+        setNewSubjectForm({
+          name: "",
+          code: "",
+          remainingVideos: 20,
+          averageVideoDuration: 1.5,
+          priority: "High",
+          color: "#3B82F6",
+        });
+        loadAllData();
+      } else {
+        showNotification(data.message || "Failed to add subject", "error");
+      }
+    } catch (err: any) {
+      showNotification(err.message, "error");
     }
   };
 
@@ -394,20 +438,64 @@ export default function GatePlannerPage() {
   };
 
   const w = overview?.workload || {
-    totalRemainingVideos: 430,
-    totalRemainingHours: 674.5,
+    totalInitialVideos: 0,
+    totalRemainingVideos: 0,
+    totalRemainingHours: 0,
     totalCompletedVideos: 0,
     overallCompletionPercentage: 0,
-    daysRemainingUntilDeadline: 38,
-    effectiveStudyDays: 33,
-    totalAvailableStudyHours: 330,
-    dailyRequiredLectureHours: 20.4,
-    workloadGapHours: 344.5,
-    isFeasibleByDeadline: false,
+    daysRemainingUntilDeadline: 0,
+    effectiveStudyDays: 0,
+    totalAvailableStudyHours: 0,
+    dailyRequiredLectureHours: 0,
+    workloadGapHours: 0,
+    isFeasibleByDeadline: true,
     feasibilityVerdict: "",
     recommendations: [],
     subjects: [],
   };
+
+  const deadlineShort = settingsForm.phase1Deadline
+    ? new Date(settingsForm.phase1Deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : "Dec 31";
+
+  const studyUnitMap = {
+    videos: {
+      singular: "Video",
+      plural: "Videos",
+      remainingTitle: "Remaining Videos",
+      hoursTitle: "Lecture Hours",
+      hoursSub: `@ ${settingsForm.playbackSpeed}x playback speed`,
+    },
+    chapters: {
+      singular: "Chapter",
+      plural: "Chapters",
+      remainingTitle: "Remaining Chapters",
+      hoursTitle: "Study Hours",
+      hoursSub: "Textbook & notes study",
+    },
+    topics: {
+      singular: "Topic",
+      plural: "Topics",
+      remainingTitle: "Remaining Topics",
+      hoursTitle: "Study Hours",
+      hoursSub: "Syllabus & concept mastery",
+    },
+    problems: {
+      singular: "Problem Set",
+      plural: "Problem Sets",
+      remainingTitle: "Remaining Sets",
+      hoursTitle: "Practice Hours",
+      hoursSub: "Problem solving & drills",
+    },
+    hours: {
+      singular: "Session",
+      plural: "Sessions",
+      remainingTitle: "Remaining Sessions",
+      hoursTitle: "Study Hours",
+      hoursSub: "Time-blocked study plan",
+    },
+  };
+  const unitLabels = studyUnitMap[settingsForm.studyStyle || "videos"] || studyUnitMap.videos;
 
   const isJanuary2027 = overview?.settings?.currentPhase === "Phase 2 - PYQ Practice" || new Date() >= new Date("2027-01-01");
 
@@ -562,22 +650,22 @@ export default function GatePlannerPage() {
           </div>
         )}
 
-        {/* Dedicated GATE Countdown & Daily Motivation Widget */}
-        <GateCountdownMotivationCard variant="planner" customWorkload={w} />
+        {/* Dedicated Exam Countdown & Daily Motivation Widget */}
+        <GateCountdownMotivationCard variant="planner" customWorkload={w} examSettings={settingsForm} />
 
         {/* Top KPI Cards (Always visible on Overview, Tracker, Subjects) */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-          {/* Card 1: Remaining Videos */}
+          {/* Card 1: Remaining Units */}
           <div className="rounded-3xl border bg-card/60 p-4 sm:p-5 backdrop-blur-sm space-y-1.5 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-semibold uppercase tracking-wider">Remaining Videos</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{unitLabels.remainingTitle}</span>
               <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
                 <Video className="h-4 w-4" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-foreground">
               {w.totalRemainingVideos}
-              <span className="text-xs font-normal text-muted-foreground ml-1.5">/ {w.totalInitialVideos || 430}</span>
+              <span className="text-xs font-normal text-muted-foreground ml-1.5">/ {w.totalInitialVideos ?? 0}</span>
             </div>
             <p className="text-[11px] text-muted-foreground">
               {w.totalCompletedVideos} completed ({w.overallCompletionPercentage}%)
@@ -587,7 +675,7 @@ export default function GatePlannerPage() {
           {/* Card 2: Remaining Hours */}
           <div className="rounded-3xl border bg-card/60 p-4 sm:p-5 backdrop-blur-sm space-y-1.5 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-semibold uppercase tracking-wider">Lecture Hours</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{unitLabels.hoursTitle}</span>
               <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
                 <Clock className="h-4 w-4" />
               </div>
@@ -597,24 +685,24 @@ export default function GatePlannerPage() {
               <span className="text-xs font-normal text-muted-foreground ml-1.5">hrs</span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              @ {settingsForm.playbackSpeed}x playback speed
+              {unitLabels.hoursSub}
             </p>
           </div>
 
-          {/* Card 3: Days Remaining to GATE Exam */}
+          {/* Card 3: Days Remaining to Exam */}
           <div className="rounded-3xl border bg-card/60 p-4 sm:p-5 backdrop-blur-sm space-y-1.5 shadow-sm">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-semibold uppercase tracking-wider">To GATE Exam</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">To {settingsForm.examLabel || "Exam"}</span>
               <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
                 <Flame className="h-4 w-4" />
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-foreground">
-              {w.daysRemainingUntilGateExam ?? 75}
+              {w.daysRemainingUntilGateExam ?? 0}
               <span className="text-xs font-normal text-muted-foreground ml-1.5">days</span>
             </div>
             <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-              {w.daysRemainingUntilDeadline}d to Phase 1 (Dec 31)
+              {w.daysRemainingUntilDeadline}d to Phase 1 ({deadlineShort})
             </p>
           </div>
 
@@ -692,8 +780,8 @@ export default function GatePlannerPage() {
             {/* Subject Cards Grid */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-foreground">Subject Progress & Completion Status</h2>
-                <p className="text-xs text-muted-foreground">Prioritized according to GATE CSE high-yield weightage</p>
+                <h2 className="text-lg font-bold text-foreground">Subject Progress &amp; Completion Status</h2>
+                <p className="text-xs text-muted-foreground">Prioritized according to your {settingsForm.examLabel || "Exam"} study plan</p>
               </div>
               <button
                 onClick={() => setActiveTab("subjects")}
@@ -971,17 +1059,24 @@ export default function GatePlannerPage() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-foreground">GATE CSE Subjects & Prioritization</h2>
+                <h2 className="text-lg font-bold text-foreground">{settingsForm.examLabel || "Exam"} Subjects &amp; Prioritization</h2>
                 <p className="text-xs text-muted-foreground">
-                  All lecture counts, durations, and priority levels are fully editable
+                  All {unitLabels.plural.toLowerCase()} counts, durations, and priority levels are fully editable
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowAddSubjectModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Subject
+                </button>
+                <button
                   onClick={handleResetToDefaults}
                   className="rounded-2xl border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
                 >
-                  Reset Defaults
+                  Load GATE CS Template
                 </button>
               </div>
             </div>
@@ -1106,7 +1201,7 @@ export default function GatePlannerPage() {
                 <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
                   <span className="text-[10px] uppercase font-bold">High Priority</span>
                   <p className="text-base font-extrabold text-foreground">{w.highPriorityRemainingHours} hrs</p>
-                  <p className="text-[10px] text-muted-foreground">Must complete by Dec 31</p>
+                  <p className="text-[10px] text-muted-foreground">Must complete by {deadlineShort}</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
                   <span className="text-[10px] uppercase font-bold">Medium Priority</span>
@@ -1428,22 +1523,42 @@ export default function GatePlannerPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Video Playback Speed Multiplier</label>
+                <label className="text-xs font-bold text-foreground">Preparation Style / Study Unit</label>
                 <select
-                  value={settingsForm.playbackSpeed}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, playbackSpeed: Number(e.target.value) })}
+                  value={settingsForm.studyStyle}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, studyStyle: e.target.value as any })}
                   className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
                 >
-                  <option value={1.0}>1.0x (Standard duration)</option>
-                  <option value={1.25}>1.25x (Saves 20% lecture time)</option>
-                  <option value={1.5}>1.5x (Saves 33% lecture time)</option>
-                  <option value={1.75}>1.75x (Saves 43% lecture time)</option>
-                  <option value={2.0}>2.0x (Saves 50% lecture time)</option>
+                  <option value="videos">Video Lectures (Tracks Videos &amp; Playback Speed)</option>
+                  <option value="topics">Syllabus Topics (Tracks Topics &amp; Study Hours)</option>
+                  <option value="chapters">Textbook / Notes Chapters (Tracks Chapters &amp; Hours)</option>
+                  <option value="problems">Problem Sets / Practice Drills (Tracks Sets &amp; Hours)</option>
+                  <option value="hours">Time-Blocked Study Hours Only</option>
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Adjusting playback speed recalculates remaining hours across all 14 subjects automatically.
+                  Choose how you track your syllabus progress — the planner adapts all labels and metrics to match your style.
                 </p>
               </div>
+
+              {settingsForm.studyStyle === "videos" && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Video Playback Speed Multiplier</label>
+                  <select
+                    value={settingsForm.playbackSpeed}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, playbackSpeed: Number(e.target.value) })}
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  >
+                    <option value={1.0}>1.0x (Standard duration)</option>
+                    <option value={1.25}>1.25x (Saves 20% lecture time)</option>
+                    <option value={1.5}>1.5x (Saves 33% lecture time)</option>
+                    <option value={1.75}>1.75x (Saves 43% lecture time)</option>
+                    <option value={2.0}>2.0x (Saves 50% lecture time)</option>
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Adjusting playback speed recalculates remaining lecture hours across your subjects automatically.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-foreground">Active Preparation Phase</label>
@@ -1452,8 +1567,8 @@ export default function GatePlannerPage() {
                   onChange={(e) => setSettingsForm({ ...settingsForm, currentPhase: e.target.value as any })}
                   className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
                 >
-                  <option value="Phase 1 - Lectures & Concept">Phase 1 - Lectures & Concept (Until Dec 31, 2026)</option>
-                  <option value="Phase 2 - PYQ Practice">Phase 2 - PYQ Practice (From Jan 1, 2027)</option>
+                  <option value="Phase 1 - Lectures & Concept">Phase 1 - Syllabus &amp; Concept Mastery (Until {deadlineShort})</option>
+                  <option value="Phase 2 - PYQ Practice">Phase 2 - PYQ &amp; Mock Test Practice</option>
                 </select>
               </div>
 
@@ -1962,6 +2077,108 @@ export default function GatePlannerPage() {
                     className="rounded-2xl bg-primary px-5 py-2 font-bold text-primary-foreground shadow-md hover:bg-primary/90"
                   >
                     Add to Mistake Notebook
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: ADD CUSTOM SUBJECT */}
+        {showAddSubjectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-primary" />
+                  Add {settingsForm.examLabel || "Exam"} Subject
+                </h3>
+                <button
+                  onClick={() => setShowAddSubjectModal(false)}
+                  className="p-1 rounded-xl text-muted-foreground hover:bg-muted"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateSubject} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-bold text-foreground">Subject Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Machine Learning"
+                      value={newSubjectForm.name}
+                      onChange={(e) => setNewSubjectForm({ ...newSubjectForm, name: e.target.value })}
+                      className="w-full rounded-2xl border bg-background px-3.5 py-2.5 font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-foreground">Short Code</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. ML"
+                      value={newSubjectForm.code}
+                      onChange={(e) => setNewSubjectForm({ ...newSubjectForm, code: e.target.value.toUpperCase() })}
+                      className="w-full rounded-2xl border bg-background px-3.5 py-2.5 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-bold text-foreground">Total {unitLabels.plural}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={newSubjectForm.remainingVideos}
+                      onChange={(e) => setNewSubjectForm({ ...newSubjectForm, remainingVideos: Number(e.target.value) })}
+                      className="w-full rounded-2xl border bg-background px-3.5 py-2.5 font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-foreground">Hours per {unitLabels.singular}</label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0.25"
+                      required
+                      value={newSubjectForm.averageVideoDuration}
+                      onChange={(e) => setNewSubjectForm({ ...newSubjectForm, averageVideoDuration: Number(e.target.value) })}
+                      className="w-full rounded-2xl border bg-background px-3.5 py-2.5 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-foreground">Priority</label>
+                  <select
+                    value={newSubjectForm.priority}
+                    onChange={(e) => setNewSubjectForm({ ...newSubjectForm, priority: e.target.value as any })}
+                    className="w-full rounded-2xl border bg-background px-3.5 py-2.5 font-semibold"
+                  >
+                    <option value="High">High Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="Low">Low Priority</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSubjectModal(false)}
+                    className="rounded-2xl border px-4 py-2 font-bold text-muted-foreground hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-2xl bg-primary px-5 py-2 font-bold text-primary-foreground shadow-md hover:bg-primary/90"
+                  >
+                    Add Subject
                   </button>
                 </div>
               </form>

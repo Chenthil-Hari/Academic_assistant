@@ -59,6 +59,12 @@ export async function PUT(req: NextRequest) {
     if (body.examLabel !== undefined) settings.examLabel = body.examLabel;
     if (body.targetYear !== undefined) settings.targetYear = Math.max(2024, Math.min(2035, Number(body.targetYear)));
     if (body.targetScore !== undefined) settings.targetScore = Math.max(1, Math.min(100, Number(body.targetScore)));
+    if (body.studyStyle !== undefined) {
+      settings.studyStyle = body.studyStyle;
+      if (body.studyStyle !== "videos") {
+        settings.playbackSpeed = 1.0;
+      }
+    }
     if (body.dailyStudyHours !== undefined) {
       settings.dailyStudyHours = Math.max(1, Math.min(20, Number(body.dailyStudyHours)));
     }

@@ -20,15 +20,27 @@ import { GATE_MOTIVATION_QUOTES, GateMotivation } from "@/lib/gate/calculations"
 interface GateCountdownProps {
   variant?: "dashboard" | "planner";
   customWorkload?: any;
+  examSettings?: {
+    examType?: string;
+    examLabel?: string;
+    gateExamDate?: string;
+    phase1Deadline?: string;
+  };
 }
 
 export function GateCountdownMotivationCard({
   variant = "dashboard",
   customWorkload,
+  examSettings,
 }: GateCountdownProps) {
   const [data, setData] = useState<any>(customWorkload || null);
+  const [settings, setSettings] = useState<any>(examSettings || null);
   const [loading, setLoading] = useState(!customWorkload);
   const [quoteIndex, setQuoteIndex] = useState(0);
+
+  useEffect(() => {
+    if (examSettings) setSettings(examSettings);
+  }, [examSettings]);
 
   useEffect(() => {
     if (customWorkload) {
@@ -42,8 +54,9 @@ export function GateCountdownMotivationCard({
     try {
       const res = await fetch("/api/gate/overview");
       const json = await res.json();
-      if (json.success && json.workload) {
-        setData(json.workload);
+      if (json.success) {
+        if (json.workload) setData(json.workload);
+        if (json.settings) setSettings(json.settings);
       }
     } catch (err) {
       console.error("Failed to fetch GATE overview:", err);
@@ -95,19 +108,25 @@ export function GateCountdownMotivationCard({
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-xs font-bold text-white shadow-sm shadow-blue-500/30">
               <Target className="h-3.5 w-3.5" />
-              <span>GATE 2027 CSE</span>
+              <span>{settings?.examLabel || "GATE 2027"}</span>
             </span>
 
             {/* Main Exam Countdown Badge */}
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-black text-amber-500 dark:text-amber-400">
               <Flame className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
-              <span>{daysToGate} Days to GATE 2027</span>
+              <span>{daysToGate} Days to {settings?.examLabel || "Exam"}</span>
             </span>
 
             {/* Phase 1 Deadline Badge */}
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
               <Clock className="h-3.5 w-3.5" />
-              <span>{daysToPhase1} Days to Phase 1 Finish (Dec 31)</span>
+              <span>
+                {daysToPhase1} Days to Phase 1 Finish (
+                {settings?.phase1Deadline
+                  ? new Date(settings.phase1Deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                  : "Dec 31"}
+                )
+              </span>
             </span>
           </div>
 
@@ -116,7 +135,7 @@ export function GateCountdownMotivationCard({
               href="/gate-planner"
               className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors group"
             >
-              <span>Open GATE Planner</span>
+              <span>Open {settings?.examLabel || "Exam"} Planner</span>
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
           )}
