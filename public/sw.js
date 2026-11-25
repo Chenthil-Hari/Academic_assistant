@@ -1,12 +1,7 @@
 // Service Worker for Academic AI (PWA Offline Caching + Web Push & Notification Handling)
 
-const CACHE_NAME = "academic-ai-v1";
+const CACHE_NAME = "academic-ai-v2";
 const STATIC_ASSETS = [
-  "/",
-  "/dashboard",
-  "/attendance",
-  "/timetable",
-  "/calendar",
   "/manifest.json",
   "/icon.svg"
 ];
@@ -41,8 +36,12 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests or chrome-extension URLs
-  if (event.request.method !== "GET" || !url.protocol.startsWith("http")) {
+  // Skip non-GET requests, non-http URLs, or page navigations (prevents Chrome net::ERR_FAILED on cached redirects)
+  if (
+    event.request.method !== "GET" ||
+    !url.protocol.startsWith("http") ||
+    event.request.mode === "navigate"
+  ) {
     return;
   }
 
