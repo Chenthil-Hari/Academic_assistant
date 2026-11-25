@@ -51,7 +51,7 @@ export default function SettingsPage() {
   const [linkToken, setLinkToken] = useState("");
   const [linkTokenLoading, setLinkTokenLoading] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [botUsername, setBotUsername] = useState("AcademicAI_Official_Bot");
+  const [botUsername, setBotUsername] = useState("Academic_hari_bot");
   const [disconnecting, setDisconnecting] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -226,7 +226,7 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         setLinkToken(data.token);
-        setBotUsername(data.botUsername || "AcademicAI_Official_Bot");
+        setBotUsername(data.botUsername || "Academic_hari_bot");
       } else {
         setMessage({ type: "error", text: data.message || "Failed to generate link token." });
       }
@@ -653,7 +653,17 @@ export default function SettingsPage() {
                     <div className="font-semibold text-foreground text-[11px]">How to connect:</div>
                     <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
                       <li>Click <strong>"Generate Link Token"</strong> below</li>
-                      <li>Open Telegram and search for <strong>@{botUsername}</strong></li>
+                      <li>
+                        Open Telegram and tap{" "}
+                        <a
+                          href={`https://t.me/${botUsername}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-sky-500 underline hover:text-sky-400"
+                        >
+                          @{botUsername}
+                        </a>
+                      </li>
                       <li>Send the command shown below to the bot</li>
                       <li>Your Telegram will be linked instantly ✅</li>
                     </ol>

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     dbUser.set("telegramLinkTokenExpires", new Date(Date.now() + 15 * 60 * 1000));
     await dbUser.save();
 
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "AcademicAI_Official_Bot";
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "Academic_hari_bot";
     return NextResponse.json({
       success: true,
       token,
