@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         await answerTelegramCallbackQuery(cq.id, `🎉 ${hours} Hours Logged in GATE Planner!`, false);
 
         if (messageId) {
-          const updatedMsg = `✅ *GATE Study Session Confirmed!*\n\n• **Hours Logged Today:** **${hours} Hours**\n• **Subject Progressed:** ${activeSubject ? activeSubject.name : "High-Priority Subject"}\n• **Videos Deducted:** ${videosToDeduct} videos\n\n🎉 Outstanding discipline, ${user.name || "Hari"}! Your consistency brings you one day closer to your dream IIT seat! Sleep well! 🚀`;
+          const updatedMsg = `✅ *Study Session Confirmed!*\n\n• **Hours Logged Today:** **${hours} Hours**\n• **Subject Progressed:** ${activeSubject ? activeSubject.name : "High-Priority Subject"}\n• **Units Completed:** ${videosToDeduct}\n\n🎉 Outstanding discipline, ${user.name || "Student"}! Keep up the great consistency! 🚀`;
           await editTelegramMessage(chatId, messageId, updatedMsg);
         }
 
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
     if (text === "/start") {
       const welcomeMsg = `👋 *Academic AI Assistant*
 
-Hello *${user.name || "Hari"}*! 🎓
+Hello *${user.name || "Student"}*! 🎓
 
 I am your personal Academic AI Assistant on Telegram, connected directly to your website account at [hari07.tech](https://hari07.tech).
 
@@ -308,7 +308,8 @@ Just send your question in plain English and I'll look up your live records imme
       const { executeAiTool } = await import("@/lib/ai/tools");
       const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, user._id.toString());
       const recs = (data.recommendations || []).map((r: string) => `• ${r}`).join("\n");
-      const msg = `🎯 *GATE 2027 Preparation Snapshot*\n━━━━━━━━━━━━━━━━━━━━\n• 🔥 *Days to GATE 2027 Exam:* **${data.daysRemainingUntilGateExam ?? 75} days** (${data.gateExamDate || "Feb 6, 2027"})\n• 📅 *Days to Phase 1 Finish:* **${data.daysRemainingUntilDeadline} days** (Dec 31, 2026)\n• 📚 *Remaining Videos:* **${data.totalRemainingVideos} videos** (${data.totalRemainingHours}h)\n• ⚡ *Available Study Capacity:* **${data.totalAvailableStudyHours} hrs** (@ 10h/day for ${data.effectiveStudyDays} study days)\n• 🎯 *Status:* ${data.isFeasibleByDeadline ? "✅ *ON TRACK*" : `⚠️ *WORKLOAD DEFICIT (${data.workloadGapHours} Hours)*`}\n\n💡 *Realistic Recommendations:*\n${recs}\n\n👉 [Open Full Planner on hari07.tech](https://hari07.tech/gate-planner)`;
+      const examLabel = data.examLabel || "Exam";
+      const msg = `🎯 *${examLabel} Preparation Snapshot*\n━━━━━━━━━━━━━━━━━━━━\n• 🔥 *Days to ${examLabel}:* **${data.daysRemainingUntilGateExam ?? 0} days** (${data.gateExamDate || "Exam Day"})\n• 📅 *Days to Phase 1 Finish:* **${data.daysRemainingUntilDeadline} days** (${data.phase1Deadline || "Dec 31, 2026"})\n• 📚 *Remaining Workload:* **${data.totalRemainingVideos} units** (${data.totalRemainingHours}h)\n• ⚡ *Available Study Capacity:* **${data.totalAvailableStudyHours} hrs** (@ ${data.dailyStudyHours || 6}h/day for ${data.effectiveStudyDays} study days)\n• 🎯 *Status:* ${data.isFeasibleByDeadline ? "✅ *ON TRACK*" : `⚠️ *WORKLOAD DEFICIT (${data.workloadGapHours} Hours)*`}\n\n💡 *Realistic Recommendations:*\n${recs}\n\n👉 [Open Full Planner on hari07.tech](https://hari07.tech/gate-planner)`;
       await sendTelegramAlert(chatId, msg);
       return NextResponse.json({ ok: true });
     }

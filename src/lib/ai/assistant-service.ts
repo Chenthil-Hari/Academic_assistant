@@ -21,7 +21,7 @@ export async function processUserMessage(params: {
   const { userId, message } = params;
   const userObjectId = new mongoose.Types.ObjectId(userId);
   const userDoc = await User.findById(userObjectId);
-  const studentName = userDoc?.name || "Hari";
+  const studentName = userDoc?.name || "Student";
 
   // 1. Fetch or create Conversation in MongoDB
   let conversation: IConversation | null = null;
@@ -219,7 +219,7 @@ async function runGroundedFallback(
   message: string,
   userId: string,
   toolCalls: string[],
-  studentName: string = "Hari"
+  studentName: string = "Student"
 ): Promise<string> {
   const lower = message.toLowerCase();
 
@@ -319,7 +319,8 @@ async function runGroundedFallback(
     toolCalls.push("get_gate_workload_and_deadline_status");
     const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, userId);
     const mot = data.dailyMotivation || {};
-    return `🔥 **GATE 2027 Countdown & Daily Motivation**\n\n• **Days Until GATE 2027 Exam:** **${data.daysRemainingUntilGateExam ?? 75} days** (${data.gateExamDate || "Feb 2027"})\n• **Days Until Phase 1 Deadline:** **${data.daysRemainingUntilDeadline} days** (Dec 31, 2026)\n• **Remaining Lecture Hours:** **${data.totalRemainingHours} hrs** across ${data.totalRemainingVideos} videos\n\n💡 **Daily Mindset Quote (${mot.tag || "Consistency"}):**\n> *"${mot.quote || "Discipline is choosing between what you want now and what you want most. Focus on the IIT goal."}"*\n> — **${mot.author || "GATE AIR 1 Mindset"}**\n\n⚡ **Today's Action Tip:** ${mot.actionTip || "Complete today's 10 hours with 100% focus."}`;
+    const examLabel = data.examLabel || "Exam";
+    return `🔥 **${examLabel} Countdown & Daily Motivation**\n\n• **Days Until ${examLabel}:** **${data.daysRemainingUntilGateExam ?? 0} days** (${data.gateExamDate || "Exam Day"})\n• **Days Until Phase 1 Deadline:** **${data.daysRemainingUntilDeadline} days** (${data.phase1Deadline || "Dec 31, 2026"})\n• **Remaining Study Hours:** **${data.totalRemainingHours} hrs** (${data.totalRemainingVideos} units)\n\n💡 **Daily Mindset Quote (${mot.tag || "Consistency"}):**\n> *"${mot.quote || "Discipline is choosing between what you want now and what you want most."}"*\n> — **${mot.author || "Mindset"}**\n\n⚡ **Today's Action Tip:** ${mot.actionTip || "Complete today's study target with full focus."}`;
   }
 
   if (
@@ -333,7 +334,8 @@ async function runGroundedFallback(
     toolCalls.push("get_gate_workload_and_deadline_status");
     const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, userId);
     const recs = (data.recommendations || []).map((r: string) => `• ${r}`).join("\n");
-    return `🎯 **GATE 2027 Phase 1 Deadline Feasibility Status**\n\n• **Target Deadline:** December 31, 2026\n• **Days Remaining:** **${data.daysRemainingUntilDeadline} days** (${data.effectiveStudyDays} effective study days)\n• **Remaining Lectures:** **${data.totalRemainingVideos} videos** (**${data.totalRemainingHours} lecture hours**)\n• **Study Capacity Available:** **${data.totalAvailableStudyHours} hours** (@ 10h/day)\n• **Status:** ${data.isFeasibleByDeadline ? "✅ **ON TRACK**" : `⚠️ **WORKLOAD DEFICIT (${data.workloadGapHours} Hours)**`}\n\n💡 **Realistic Recommendations:**\n${recs}`;
+    const examLabel = data.examLabel || "Exam";
+    return `🎯 **${examLabel} Phase 1 Deadline Feasibility Status**\n\n• **Target Deadline:** ${data.phase1Deadline || "Dec 31, 2026"}\n• **Days Remaining:** **${data.daysRemainingUntilDeadline} days** (${data.effectiveStudyDays} effective study days)\n• **Remaining Workload:** **${data.totalRemainingVideos} units** (**${data.totalRemainingHours} hours**)\n• **Study Capacity Available:** **${data.totalAvailableStudyHours} hours** (@ ${data.dailyStudyHours || 6}h/day)\n• **Status:** ${data.isFeasibleByDeadline ? "✅ **ON TRACK**" : `⚠️ **WORKLOAD DEFICIT (${data.workloadGapHours} Hours)**`}\n\n💡 **Realistic Recommendations:**\n${recs}`;
   }
 
   if (
@@ -367,7 +369,8 @@ async function runGroundedFallback(
   if (lower.includes("gate")) {
     toolCalls.push("get_gate_workload_and_deadline_status");
     const data = await executeAiTool("get_gate_workload_and_deadline_status", {}, userId);
-    return `🎯 **GATE 2027 Preparation Planner Status**\n\n• **Phase 1 Deadline:** December 31, 2026 (${data.daysRemainingUntilDeadline} days left)\n• **Remaining Videos:** **${data.totalRemainingVideos} videos** (${data.totalRemainingHours} hrs)\n• **Available Capacity:** **${data.totalAvailableStudyHours} hrs** (10h/day for ${data.effectiveStudyDays} study days)\n• **High-Priority Hours:** **${data.highPriorityRemainingHours} hrs**\n• **Daily Required:** **${data.dailyRequiredLectureHours} h/day**\n\n${data.feasibilityVerdict}\n\n*Ask "What should I study today?", "Am I on track?", or "Which subject is falling behind?" for more details!*`;
+    const examLabel = data.examLabel || "Exam";
+    return `🎯 **${examLabel} Preparation Planner Status**\n\n• **Phase 1 Deadline:** ${data.phase1Deadline || "Dec 31, 2026"} (${data.daysRemainingUntilDeadline} days left)\n• **Remaining Units:** **${data.totalRemainingVideos} units** (${data.totalRemainingHours} hrs)\n• **Available Capacity:** **${data.totalAvailableStudyHours} hrs** (${data.dailyStudyHours || 6}h/day for ${data.effectiveStudyDays} study days)\n• **High-Priority Hours:** **${data.highPriorityRemainingHours} hrs**\n• **Daily Required:** **${data.dailyRequiredLectureHours} h/day**\n\n${data.feasibilityVerdict}\n\n*Ask "What should I study today?", "Am I on track?", or "Which subject is falling behind?" for more details!*`;
   }
 
   // 1. Comprehensive Academic Overview / All Details from the Website

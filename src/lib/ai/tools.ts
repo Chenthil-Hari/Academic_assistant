@@ -1363,12 +1363,6 @@ export async function executeAiTool(
       const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
       const { GateProgress } = await import("@/lib/db/models/GateProgress");
       const { generateGateSchedule } = await import("@/lib/gate/scheduler");
-      const { INITIAL_GATE_SUBJECTS } = await import("@/lib/gate/calculations");
-
-      let count = await GateSubject.countDocuments({ userId: userObjectId });
-      if (count === 0) {
-        await GateSubject.insertMany(INITIAL_GATE_SUBJECTS.map((s) => ({ ...s, userId: userObjectId, initialVideos: s.remainingVideos, completedVideos: 0, status: "In Progress" })));
-      }
 
       const [subjects, settings] = await Promise.all([
         GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 }),
@@ -1422,12 +1416,7 @@ export async function executeAiTool(
     case "get_gate_workload_and_deadline_status": {
       const { GateSubject } = await import("@/lib/db/models/GateSubject");
       const { GateUserSettings } = await import("@/lib/db/models/GateUserSettings");
-      const { calculateGateWorkload, INITIAL_GATE_SUBJECTS } = await import("@/lib/gate/calculations");
-
-      let count = await GateSubject.countDocuments({ userId: userObjectId });
-      if (count === 0) {
-        await GateSubject.insertMany(INITIAL_GATE_SUBJECTS.map((s) => ({ ...s, userId: userObjectId, initialVideos: s.remainingVideos, completedVideos: 0, status: "In Progress" })));
-      }
+      const { calculateGateWorkload } = await import("@/lib/gate/calculations");
 
       const [subjects, settings] = await Promise.all([
         GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 }),
@@ -1438,11 +1427,15 @@ export async function executeAiTool(
         subjects,
         deadline: settings?.phase1Deadline,
         gateExamDate: settings?.gateExamDate || new Date("2027-02-06T09:00:00.000Z"),
-        dailyStudyHours: settings?.dailyStudyHours || 10,
+        dailyStudyHours: settings?.dailyStudyHours || 6,
         playbackSpeed: settings?.playbackSpeed || 1.0,
       });
 
       return {
+        examLabel: settings?.examLabel || "Exam",
+        studyStyle: settings?.studyStyle || "topics",
+        dailyStudyHours: settings?.dailyStudyHours || 6,
+        phase1Deadline: settings?.phase1Deadline ? new Date(settings.phase1Deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Dec 31, 2026",
         totalRemainingVideos: workload.totalRemainingVideos,
         totalRemainingHours: workload.totalRemainingHours,
         totalCompletedVideos: workload.totalCompletedVideos,
@@ -1465,12 +1458,6 @@ export async function executeAiTool(
 
     case "get_gate_subject_breakdown": {
       const { GateSubject } = await import("@/lib/db/models/GateSubject");
-      const { INITIAL_GATE_SUBJECTS } = await import("@/lib/gate/calculations");
-
-      let count = await GateSubject.countDocuments({ userId: userObjectId });
-      if (count === 0) {
-        await GateSubject.insertMany(INITIAL_GATE_SUBJECTS.map((s) => ({ ...s, userId: userObjectId, initialVideos: s.remainingVideos, completedVideos: 0, status: "In Progress" })));
-      }
 
       const subjects = await GateSubject.find({ userId: userObjectId }).sort({ priorityOrder: 1 });
 

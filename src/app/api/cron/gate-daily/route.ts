@@ -80,9 +80,10 @@ async function handleGateDaily(req: NextRequest) {
         continue;
       }
 
-      // 1. Ensure GATE subjects and settings exist
+      // 1. Only auto-seed Hari's personal GATE subjects for Hari's account
       let count = await GateSubject.countDocuments({ userId: u._id });
-      if (count === 0) {
+      const isHari = u.email?.toLowerCase() === "chenthilhari@gmail.com";
+      if (count === 0 && isHari) {
         await GateSubject.insertMany(
           INITIAL_GATE_SUBJECTS.map((s) => ({
             ...s,
@@ -98,7 +99,12 @@ async function handleGateDaily(req: NextRequest) {
       if (!settings) {
         settings = await GateUserSettings.create({
           userId: u._id,
-          dailyStudyHours: 10,
+          examType: isHari ? "GATE CS" : "GATE",
+          examLabel: isHari ? "GATE 2027" : "Exam 2027",
+          targetYear: 2027,
+          targetScore: 65,
+          studyStyle: isHari ? "videos" : "topics",
+          dailyStudyHours: isHari ? 10 : 6,
           studyDaysPerWeek: 6,
           restDayOfWeek: 0,
           phase1Deadline: new Date("2026-12-31T23:59:59.999Z"),
@@ -109,6 +115,10 @@ async function handleGateDaily(req: NextRequest) {
       }
 
       const subjects = await GateSubject.find({ userId: u._id }).sort({ priorityOrder: 1 });
+      if (subjects.length === 0) {
+        results.push({ userId: u._id, email: u.email, status: "skipped_no_subjects" });
+        continue;
+      }
 
       const workload = calculateGateWorkload({
         subjects,
@@ -150,7 +160,23 @@ async function handleGateDaily(req: NextRequest) {
         }
 
         const mot = workload.motivation;
-        const msg = `🌅 *Good Morning, ${u.name || "Aspirant"}!* 🚀\n\n🎯 *GATE 2027 Morning Study Briefing*\n━━━━━━━━━━━━━━━━━━━━\n• 🔥 *${workload.daysRemainingUntilGateExam} Days to GATE 2027 Exam* (Feb 6)\n• 📅 *${workload.daysRemainingUntilDeadline} Days to Phase 1 Finish* (Dec 31)\n• 📚 *Remaining Workload:* ${workload.totalRemainingVideos} videos (${workload.totalRemainingHours}h)\n• ⚡ *Target for Today:* ${isSunday ? "Light Revision / Rest" : `${settings.dailyStudyHours} Hours Deep Study`}\n\n📋 *Today's Planned Study Slots:*\n${slotsText}\n\n💡 *Daily Mindset Quote (${mot.tag}):*\n> _"${mot.quote}"_\n> — *${mot.author}*\n\n⚡ *Action Tip:* ${mot.actionTip}\n━━━━━━━━━━━━━━━━━━━━\n_Give your 100% to today's study blocks!_`;
+        const examLabel = settings.examLabel || "Exam";
+        const examDateStr = settings.gateExamDate
+          ? new Date(settings.gateExamDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : "Exam Day";
+        const deadlineStr = settings.phase1Deadline
+          ? new Date(settings.phase1Deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : "Deadline";
+        const unitMap: Record<string, string> = {
+          videos: "videos",
+          chapters: "chapters",
+          topics: "topics",
+          problems: "sets",
+          hours: "sessions",
+        };
+        const unitWord = unitMap[settings.studyStyle || "videos"] || "units";
+
+        const msg = `🌅 *Good Morning, ${u.name || "Aspirant"}!* 🚀\n\n🎯 *${examLabel} Morning Study Briefing*\n━━━━━━━━━━━━━━━━━━━━\n• 🔥 *${workload.daysRemainingUntilGateExam} Days to ${examLabel}* (${examDateStr})\n• 📅 *${workload.daysRemainingUntilDeadline} Days to Phase 1 Finish* (${deadlineStr})\n• 📚 *Remaining Workload:* ${workload.totalRemainingVideos} ${unitWord} (${workload.totalRemainingHours}h)\n• ⚡ *Target for Today:* ${isSunday ? "Light Revision / Rest" : `${settings.dailyStudyHours} Hours Deep Study`}\n\n📋 *Today's Planned Study Slots:*\n${slotsText}\n\n💡 *Daily Mindset Quote (${mot.tag}):*\n> _"${mot.quote}"_\n> — *${mot.author}*\n\n⚡ *Action Tip:* ${mot.actionTip}\n━━━━━━━━━━━━━━━━━━━━\n_Give your 100% to today's study blocks!_`;
 
         const replyMarkup: TelegramReplyMarkup = {
           inline_keyboard: [
@@ -189,8 +215,17 @@ async function handleGateDaily(req: NextRequest) {
 
         const loggedHoursToday = logsToday.reduce((sum, l) => sum + (l.hoursStudied || 0), 0);
         const loggedVideosToday = logsToday.reduce((sum, l) => sum + (l.videosCompleted || 0), 0);
+        const examLabel = settings.examLabel || "Exam";
+        const unitMap: Record<string, string> = {
+          videos: "videos",
+          chapters: "chapters",
+          topics: "topics",
+          problems: "sets",
+          hours: "sessions",
+        };
+        const unitWord = unitMap[settings.studyStyle || "videos"] || "units";
 
-        const msg = `🌙 *GATE 2027 Daily Accountability Check-in*\n━━━━━━━━━━━━━━━━━━━━\nHello *${u.name || "Aspirant"}*,\nYour target today was *${settings.dailyStudyHours} Hours* of focused preparation.\n\n• ⏱️ *Logged Today:* **${loggedHoursToday} Hours** (${loggedVideosToday} videos)\n• 🔥 *Countdown:* **${workload.daysRemainingUntilGateExam} Days to GATE 2027**\n\nHow did today's study session go? Tap a button below to log your progress instantly:`;
+        const msg = `🌙 *${examLabel} Daily Accountability Check-in*\n━━━━━━━━━━━━━━━━━━━━\nHello *${u.name || "Aspirant"}*,\nYour target today was *${settings.dailyStudyHours} Hours* of focused preparation.\n\n• ⏱️ *Logged Today:* **${loggedHoursToday} Hours** (${loggedVideosToday} ${unitWord})\n• 🔥 *Countdown:* **${workload.daysRemainingUntilGateExam} Days to ${examLabel}**\n\nHow did today's study session go? Tap a button below to log your progress instantly:`;
 
         const replyMarkup: TelegramReplyMarkup = {
           inline_keyboard: [
