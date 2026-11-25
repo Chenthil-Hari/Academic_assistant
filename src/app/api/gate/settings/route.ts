@@ -18,6 +18,10 @@ export async function GET(req: NextRequest) {
     if (!settings) {
       settings = await GateUserSettings.create({
         userId: userObjectId,
+        examType: "GATE CS",
+        examLabel: "GATE 2027",
+        targetYear: 2027,
+        targetScore: 65,
         dailyStudyHours: 10,
         studyDaysPerWeek: 6,
         restDayOfWeek: 0,
@@ -51,6 +55,10 @@ export async function PUT(req: NextRequest) {
       settings = new GateUserSettings({ userId: userObjectId });
     }
 
+    if (body.examType !== undefined) settings.examType = body.examType;
+    if (body.examLabel !== undefined) settings.examLabel = body.examLabel;
+    if (body.targetYear !== undefined) settings.targetYear = Math.max(2024, Math.min(2035, Number(body.targetYear)));
+    if (body.targetScore !== undefined) settings.targetScore = Math.max(1, Math.min(100, Number(body.targetScore)));
     if (body.dailyStudyHours !== undefined) {
       settings.dailyStudyHours = Math.max(1, Math.min(20, Number(body.dailyStudyHours)));
     }

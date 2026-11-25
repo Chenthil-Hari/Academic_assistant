@@ -62,11 +62,7 @@ export async function POST(req: NextRequest) {
 
         let user = await User.findOne({ telegramChatId: chatId });
         if (!user) {
-          user = await User.findOne({ email: "chenthilhari@gmail.com" });
-        }
-
-        if (!user) {
-          await answerTelegramCallbackQuery(cq.id, "User account not linked.", true);
+          await answerTelegramCallbackQuery(cq.id, "Account not linked. Send /link TOKEN in this chat.", true);
           return NextResponse.json({ ok: true });
         }
 
@@ -129,10 +125,8 @@ export async function POST(req: NextRequest) {
       if (data.startsWith("gate_log_")) {
         const hours = Number(data.replace("gate_log_", "")) || 10;
         let user = await User.findOne({ telegramChatId: chatId });
-        if (!user) user = await User.findOne({ email: "chenthilhari@gmail.com" });
-
         if (!user) {
-          await answerTelegramCallbackQuery(cq.id, "User account not linked.", true);
+          await answerTelegramCallbackQuery(cq.id, "Account not linked. Send /link TOKEN in this chat.", true);
           return NextResponse.json({ ok: true });
         }
 
@@ -213,24 +207,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Identify or link user
+    // Identify or link user — ONLY by telegramChatId (never auto-assign to Hari)
     let user = await User.findOne({ telegramChatId: chatId });
-    if (!user) {
-      user = await User.findOne({ email: "chenthilhari@gmail.com" });
-      if (user) {
-        user.telegramChatId = chatId;
-        user.notificationPreferences = {
-          ...user.notificationPreferences,
-          telegram: true,
-        };
-        await user.save();
+
+    // Handle /link TOKEN command — link this chat to the user who generated the token
+    if (!user && text.toLowerCase().startsWith("/link ")) {
+      const token = text.split(" ")[1]?.trim();
+      if (token) {
+        const tokenUser = await User.findOne({
+          telegramLinkToken: token,
+          telegramLinkTokenExpires: { $gt: new Date() },
+          status: "approved",
+        });
+        if (tokenUser) {
+          tokenUser.telegramChatId = chatId;
+          tokenUser.notificationPreferences = {
+            ...tokenUser.notificationPreferences,
+            telegram: true,
+          };
+          tokenUser.set("telegramLinkToken", "");
+          tokenUser.set("telegramLinkTokenExpires", null);
+          await tokenUser.save();
+
+          await sendTelegramAlert(
+            chatId,
+            `✅ *Telegram Linked Successfully!*\n\nHello *${tokenUser.name}*! 🎓\n\nYour Telegram account is now connected to your Academic AI account (${tokenUser.email}).\n\nYou will receive:\n• 🔔 Daily 4:00 PM attendance check-in reminders\n• 📊 Attendance alerts for low-attendance subjects\n• 🎯 Exam planner updates\n\nType /start to explore all commands!`
+          );
+          return NextResponse.json({ ok: true });
+        } else {
+          await sendTelegramAlert(
+            chatId,
+            `❌ *Invalid or expired link token.*\n\nThe token you provided is either wrong or has expired (tokens are valid for 15 minutes).\n\nPlease go to *Settings → Notifications → Connect Telegram* on [hari07.tech](https://hari07.tech) to generate a new token.`
+          );
+          return NextResponse.json({ ok: true });
+        }
       }
     }
 
     if (!user) {
       await sendTelegramAlert(
         chatId,
-        "⚠️ You are not registered with Academic AI yet. Please log in on https://hari07.tech and set your Telegram Chat ID in Settings."
+        `👋 *Welcome to Academic AI Bot!*\n\nTo connect this Telegram account to your Academic AI profile:\n\n1️⃣ Log in to [hari07.tech](https://hari07.tech)\n2️⃣ Go to *Settings → Notifications*\n3️⃣ Click *"Connect Telegram"* to get a 6-digit token\n4️⃣ Send: \`/link YOUR_TOKEN\` here\n\nIf you don't have an account yet, register at [hari07.tech](https://hari07.tech).`
       );
       return NextResponse.json({ ok: true });
     }

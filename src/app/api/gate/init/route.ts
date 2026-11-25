@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
     if (!settings) {
       settings = await GateUserSettings.create({
         userId: userObjectId,
+        examType: "GATE CS",
+        examLabel: "GATE 2027",
+        targetYear: 2027,
+        targetScore: 65,
         dailyStudyHours: 10,
         studyDaysPerWeek: 6,
         restDayOfWeek: 0,

@@ -90,6 +90,12 @@ export default function GatePlannerPage() {
   });
 
   const [settingsForm, setSettingsForm] = useState({
+    examType: "GATE CS",
+    examLabel: "GATE 2027",
+    targetYear: 2027,
+    targetScore: 65,
+    gateExamDate: "2027-02-06",
+    phase1Deadline: "2026-12-31",
     dailyStudyHours: 10,
     studyDaysPerWeek: 6,
     playbackSpeed: 1.0,
@@ -117,6 +123,16 @@ export default function GatePlannerPage() {
         setOverview(dataOverview);
         if (dataOverview.settings) {
           setSettingsForm({
+            examType: dataOverview.settings.examType || "GATE CS",
+            examLabel: dataOverview.settings.examLabel || "GATE 2027",
+            targetYear: dataOverview.settings.targetYear || 2027,
+            targetScore: dataOverview.settings.targetScore || 65,
+            gateExamDate: dataOverview.settings.gateExamDate
+              ? new Date(dataOverview.settings.gateExamDate).toISOString().split("T")[0]
+              : "2027-02-06",
+            phase1Deadline: dataOverview.settings.phase1Deadline
+              ? new Date(dataOverview.settings.phase1Deadline).toISOString().split("T")[0]
+              : "2026-12-31",
             dailyStudyHours: dataOverview.settings.dailyStudyHours || 10,
             studyDaysPerWeek: dataOverview.settings.studyDaysPerWeek || 6,
             playbackSpeed: dataOverview.settings.playbackSpeed || 1.0,
@@ -240,6 +256,21 @@ export default function GatePlannerPage() {
         loadAllData();
       } else {
         showNotification(data.message || "Failed to reschedule", "error");
+      }
+    } catch (err: any) {
+      showNotification(err.message, "error");
+    }
+  };
+
+  const handleInitTemplate = async (reset = false) => {
+    try {
+      const res = await fetch(`/api/gate/init${reset ? "?action=reset" : ""}`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(data.message || "GATE CS syllabus template loaded!");
+        loadAllData();
+      } else {
+        showNotification(data.message || "Failed to load template", "error");
       }
     } catch (err: any) {
       showNotification(err.message, "error");
@@ -404,23 +435,23 @@ export default function GatePlannerPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary border border-primary/20">
                   <Target className="h-3.5 w-3.5" />
-                  GATE 2027 CSE Strategy
+                  {settingsForm.examType || "GATE CS"} {settingsForm.targetYear || 2027} Strategy
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
                   <Clock className="h-3.5 w-3.5" />
-                  Phase 1 Deadline: Dec 31, 2026
+                  Phase 1 Deadline: {settingsForm.phase1Deadline ? new Date(settingsForm.phase1Deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Dec 31, 2026"}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Phase 2 (PYQ): Starts Jan 1, 2027
+                  Target Score: {settingsForm.targetScore || 65}/100
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-                GATE 2027 Preparation Planner
+                {settingsForm.examLabel || "GATE 2027"} Preparation Planner
               </h1>
               <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-                Personalized study operating system with automatic workload tracking, intelligent 10h/day scheduling,
-                priority-driven lecture completion, and dedicated January PYQ practice.
+                Personalized study operating system with automatic workload tracking, intelligent {settingsForm.dailyStudyHours || 10}h/day scheduling,
+                priority-driven lecture completion, and dedicated PYQ practice.
               </p>
             </div>
 
@@ -491,7 +522,47 @@ export default function GatePlannerPage() {
           })}
         </div>
 
-        {/* Dedicated GATE 2027 Countdown & Daily Motivation Widget */}
+        {/* Empty State Onboarding for New Users */}
+        {w && (!w.subjects || w.subjects.length === 0) && (
+          <div className="rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/10 via-card to-indigo-500/5 p-6 sm:p-8 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <h2 className="text-lg sm:text-xl font-extrabold text-foreground flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Set Up Your Personal Exam Planner
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
+                  Your planner starts fresh! Customize your target exam &amp; year in Settings, add your own subjects, or load the standard GATE CS syllabus template to get started.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2.5 shrink-0">
+                <button
+                  onClick={() => setActiveTab("settings")}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
+                >
+                  <Sliders className="h-4 w-4" />
+                  Customize Exam &amp; Year
+                </button>
+                <button
+                  onClick={() => setActiveTab("subjects")}
+                  className="inline-flex items-center gap-2 rounded-2xl border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Subjects
+                </button>
+                <button
+                  onClick={() => handleInitTemplate(false)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/20"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Load GATE CS Template
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dedicated GATE Countdown & Daily Motivation Widget */}
         <GateCountdownMotivationCard variant="planner" customWorkload={w} />
 
         {/* Top KPI Cards (Always visible on Overview, Tracker, Subjects) */}
@@ -1239,22 +1310,108 @@ export default function GatePlannerPage() {
         {activeTab === "settings" && (
           <div className="max-w-2xl space-y-6">
             <div>
-              <h2 className="text-lg font-bold text-foreground">GATE Study Constraints & Configuration</h2>
-              <p className="text-xs text-muted-foreground">Adjust your daily study hours, weekly study days, and playback speed</p>
+              <h2 className="text-lg font-bold text-foreground">Exam Identity &amp; Study Configuration</h2>
+              <p className="text-xs text-muted-foreground">Customize your target exam, year, dates, daily study hours, and playback speed</p>
             </div>
 
             <form onSubmit={handleSaveSettings} className="rounded-3xl border bg-card/60 p-6 backdrop-blur-sm space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Exam Type</label>
+                  <select
+                    value={settingsForm.examType}
+                    onChange={(e) => {
+                      const examType = e.target.value;
+                      const examLabel = examType === "Custom" ? settingsForm.examLabel : `${examType} ${settingsForm.targetYear}`;
+                      setSettingsForm({ ...settingsForm, examType, examLabel });
+                    }}
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  >
+                    <option value="GATE CS">GATE CS</option>
+                    <option value="GATE DA">GATE DA</option>
+                    <option value="GATE ECE">GATE ECE</option>
+                    <option value="GATE EE">GATE EE</option>
+                    <option value="GATE ME">GATE ME</option>
+                    <option value="GATE CE">GATE CE</option>
+                    <option value="UPSC">UPSC</option>
+                    <option value="CAT">CAT</option>
+                    <option value="GRE">GRE</option>
+                    <option value="Custom">Custom</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Target Year</label>
+                  <select
+                    value={settingsForm.targetYear}
+                    onChange={(e) => {
+                      const targetYear = Number(e.target.value);
+                      const examLabel = settingsForm.examType === "Custom" ? settingsForm.examLabel : `${settingsForm.examType} ${targetYear}`;
+                      setSettingsForm({ ...settingsForm, targetYear, examLabel });
+                    }}
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  >
+                    {[2025, 2026, 2027, 2028, 2029, 2030].map((yr) => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Planner &amp; Sidebar Label</label>
+                  <input
+                    type="text"
+                    value={settingsForm.examLabel}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, examLabel: e.target.value })}
+                    placeholder="e.g. GATE DA 2028"
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Target Score (out of 100)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settingsForm.targetScore}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, targetScore: Number(e.target.value) })}
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Target Exam Date</label>
+                  <input
+                    type="date"
+                    value={settingsForm.gateExamDate}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, gateExamDate: e.target.value })}
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Syllabus Completion Deadline</label>
+                  <input
+                    type="date"
+                    value={settingsForm.phase1Deadline}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, phase1Deadline: e.target.value })}
+                    className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-foreground">Effective Study Hours Per Day</label>
                 <input
                   type="number"
-                  min="4"
+                  min="1"
                   max="18"
                   value={settingsForm.dailyStudyHours}
                   onChange={(e) => setSettingsForm({ ...settingsForm, dailyStudyHours: Number(e.target.value) })}
                   className="w-full rounded-2xl border bg-background px-4 py-2.5 text-sm font-semibold"
                 />
-                <p className="text-[11px] text-muted-foreground">Default: 10 hours/day for rigorous GATE preparation</p>
+                <p className="text-[11px] text-muted-foreground">Default: 10 hours/day for rigorous preparation</p>
               </div>
 
               <div className="space-y-1.5">

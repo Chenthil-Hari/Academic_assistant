@@ -35,7 +35,16 @@ async function handleCheckin(req: NextRequest) {
     // If triggered by a specific user manually
     const query = currentUser && !isCronAuthorized
       ? { _id: currentUser.userId }
-      : { "notificationPreferences.webPush": true };
+      : {
+          status: "approved",
+          $or: [
+            { "notificationPreferences.webPush": true },
+            {
+              "notificationPreferences.telegram": true,
+              telegramChatId: { $exists: true, $ne: "" },
+            },
+          ],
+        };
 
     const users = await User.find(query);
     const results = [];

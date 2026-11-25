@@ -2,6 +2,11 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IGateUserSettings extends Document {
   userId: mongoose.Types.ObjectId;
+  // Exam identity — fully customizable per user
+  examType: string; // e.g. "GATE CS", "GATE DA", "GATE ECE", "UPSC", "CAT", "GRE", "Custom"
+  examLabel: string; // e.g. "GATE 2027" — shown in sidebar & UI
+  targetYear: number; // e.g. 2027
+  targetScore: number; // e.g. 65 (out of 100 for GATE)
   dailyStudyHours: number; // default: 10
   studyDaysPerWeek: number; // default: 6
   restDayOfWeek: number; // default: 0 (Sunday)
@@ -23,6 +28,28 @@ const GateUserSettingsSchema = new Schema<IGateUserSettings>(
       required: true,
       unique: true,
       index: true,
+    },
+    examType: {
+      type: String,
+      default: "GATE CS",
+      trim: true,
+    },
+    examLabel: {
+      type: String,
+      default: "GATE 2027",
+      trim: true,
+    },
+    targetYear: {
+      type: Number,
+      default: 2027,
+      min: 2024,
+      max: 2035,
+    },
+    targetScore: {
+      type: Number,
+      default: 65,
+      min: 1,
+      max: 100,
     },
     dailyStudyHours: {
       type: Number,

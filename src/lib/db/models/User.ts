@@ -23,6 +23,8 @@ export interface IUser extends Document {
     };
   };
   telegramChatId?: string;
+  telegramLinkToken?: string;
+  telegramLinkTokenExpires?: Date;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   role: "admin" | "student";
@@ -98,6 +100,13 @@ const UserSchema = new Schema<IUser>(
     telegramChatId: {
       type: String,
       default: "",
+    },
+    telegramLinkToken: {
+      type: String,
+      default: "",
+    },
+    telegramLinkTokenExpires: {
+      type: Date,
     },
     resetPasswordToken: {
       type: String,

@@ -17,9 +17,10 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     const userObjectId = new mongoose.Types.ObjectId(user.userId);
 
-    // Auto-seed if first time
+    // Auto-seed Hari's personal GATE 2027 subjects ONLY for Hari's account
+    // Other users start with a clean customizable planner
     let count = await GateSubject.countDocuments({ userId: userObjectId });
-    if (count === 0) {
+    if (count === 0 && user.email?.toLowerCase() === "chenthilhari@gmail.com") {
       const docsToInsert = INITIAL_GATE_SUBJECTS.map((s) => ({
         userId: userObjectId,
         name: s.name,
@@ -38,9 +39,14 @@ export async function GET(req: NextRequest) {
 
     let settings = await GateUserSettings.findOne({ userId: userObjectId });
     if (!settings) {
+      const isHari = user.email?.toLowerCase() === "chenthilhari@gmail.com";
       settings = await GateUserSettings.create({
         userId: userObjectId,
-        dailyStudyHours: 10,
+        examType: isHari ? "GATE CS" : "GATE",
+        examLabel: isHari ? "GATE 2027" : "Exam 2027",
+        targetYear: 2027,
+        targetScore: 65,
+        dailyStudyHours: isHari ? 10 : 6,
         studyDaysPerWeek: 6,
         restDayOfWeek: 0,
         phase1Deadline: new Date("2026-12-31T23:59:59.999Z"),

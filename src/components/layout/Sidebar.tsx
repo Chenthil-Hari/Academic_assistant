@@ -40,10 +40,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [examLabel, setExamLabel] = useState("Exam");
+  const [examBadge, setExamBadge] = useState("PLANNER");
 
   useEffect(() => {
     checkAdmin();
+    loadExamLabel();
   }, []);
+
+  const loadExamLabel = async () => {
+    try {
+      const res = await fetch("/api/gate/settings");
+      const data = await res.json();
+      if (data.success && data.settings) {
+        const label = data.settings.examLabel || "GATE 2027";
+        const type = data.settings.examType || "GATE";
+        setExamLabel(label);
+        setExamBadge(type.split(" ")[0].toUpperCase().slice(0, 6) || "EXAM");
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
 
   const checkAdmin = async () => {
     try {
@@ -118,6 +136,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const Icon = item.icon;
+            const displayName = item.href === "/gate-planner" ? `${examLabel} Planner` : item.name;
+            const displayBadge = item.href === "/gate-planner" ? examBadge : item.badge;
 
             return (
               <Link
@@ -138,9 +158,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                     )}
                   />
-                  <span>{item.name}</span>
+                  <span>{displayName}</span>
                 </div>
-                {item.badge && (
+                {displayBadge && (
                   <span
                     className={cn(
                       "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase",
@@ -149,7 +169,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         : "bg-primary/10 text-primary group-hover:bg-primary/20"
                     )}
                   >
-                    {item.badge}
+                    {displayBadge}
                   </span>
                 )}
               </Link>

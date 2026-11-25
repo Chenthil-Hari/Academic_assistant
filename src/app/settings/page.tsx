@@ -13,6 +13,11 @@ import {
   PlayCircle,
   Globe,
   Sliders,
+  Link2,
+  Link2Off,
+  Copy,
+  RefreshCw,
+  Target,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -33,6 +38,22 @@ export default function SettingsPage() {
     telegramChatId: "",
   });
 
+  // GATE exam settings
+  const [gateSettings, setGateSettings] = useState({
+    examType: "GATE CS",
+    examLabel: "GATE 2027",
+    targetYear: 2027,
+    targetScore: 65,
+  });
+  const [savingGate, setSavingGate] = useState(false);
+
+  // Telegram link token flow
+  const [linkToken, setLinkToken] = useState("");
+  const [linkTokenLoading, setLinkTokenLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [botUsername, setBotUsername] = useState("AcademicAI_Official_Bot");
+  const [disconnecting, setDisconnecting] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testCronRunning, setTestCronRunning] = useState(false);
@@ -42,6 +63,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings();
+    loadGateSettings();
     checkPushSupport();
   }, []);
 
@@ -74,6 +96,23 @@ export default function SettingsPage() {
     }
   };
 
+  const loadGateSettings = async () => {
+    try {
+      const res = await fetch("/api/gate/settings");
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setGateSettings({
+          examType: data.settings.examType || "GATE CS",
+          examLabel: data.settings.examLabel || "GATE 2027",
+          targetYear: data.settings.targetYear || 2027,
+          targetScore: data.settings.targetScore || 65,
+        });
+      }
+    } catch (err) {
+      console.error("Load GATE settings error:", err);
+    }
+  };
+
   const checkPushSupport = () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
       setPushStatus("Not supported in this browser");
@@ -94,7 +133,6 @@ export default function SettingsPage() {
 
       if (permission === "granted" && "serviceWorker" in navigator) {
         const reg = await navigator.serviceWorker.ready;
-        // Fetch public VAPID key
         const vapidRes = await fetch("/api/notifications/subscribe");
         const { publicKey } = await vapidRes.json();
 
@@ -112,10 +150,7 @@ export default function SettingsPage() {
 
           setMessage({ type: "success", text: "Push notification subscription activated!" });
         } else {
-          setMessage({
-            type: "success",
-            text: "Browser notification permission granted.",
-          });
+          setMessage({ type: "success", text: "Browser notification permission granted." });
         }
       }
     } catch (err: any) {
@@ -149,6 +184,83 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveGateSettings = async () => {
+    setSavingGate(true);
+    try {
+      const res = await fetch("/api/gate/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(gateSettings),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessage({ type: "success", text: "Exam planner settings updated! Refresh the GATE Planner page to see changes." });
+      } else {
+        setMessage({ type: "error", text: data.message || "Failed to save exam settings." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setSavingGate(false);
+    }
+  };
+
+  // Auto-generate examLabel when examType or targetYear changes
+  const handleExamTypeChange = (examType: string) => {
+    const year = gateSettings.targetYear;
+    const label = examType === "Custom" ? gateSettings.examLabel : `${examType} ${year}`;
+    setGateSettings({ ...gateSettings, examType, examLabel: label });
+  };
+
+  const handleTargetYearChange = (targetYear: number) => {
+    const examType = gateSettings.examType;
+    const label = examType === "Custom" ? gateSettings.examLabel : `${examType} ${targetYear}`;
+    setGateSettings({ ...gateSettings, targetYear, examLabel: label });
+  };
+
+  const handleGenerateLinkToken = async () => {
+    setLinkTokenLoading(true);
+    setLinkToken("");
+    try {
+      const res = await fetch("/api/telegram/link", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setLinkToken(data.token);
+        setBotUsername(data.botUsername || "AcademicAI_Official_Bot");
+      } else {
+        setMessage({ type: "error", text: data.message || "Failed to generate link token." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: "Failed to generate link token." });
+    } finally {
+      setLinkTokenLoading(false);
+    }
+  };
+
+  const handleDisconnectTelegram = async () => {
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/telegram/link", { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setProfile({ ...profile, telegramChatId: "", notificationPreferences: { ...profile.notificationPreferences, telegram: false } });
+        setMessage({ type: "success", text: "Telegram disconnected successfully." });
+      } else {
+        setMessage({ type: "error", text: data.message || "Failed to disconnect Telegram." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: "Failed to disconnect Telegram." });
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(`/link ${linkToken}`);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   const handleTriggerTestCheckin = async () => {
     setTestCronRunning(true);
     setMessage(null);
@@ -174,7 +286,7 @@ export default function SettingsPage() {
 
   const handleSendTestTelegram = async () => {
     if (!profile.telegramChatId.trim()) {
-      setMessage({ type: "error", text: "Please enter your Telegram Chat ID first." });
+      setMessage({ type: "error", text: "Telegram not connected yet. Connect it first." });
       return;
     }
 
@@ -201,19 +313,21 @@ export default function SettingsPage() {
     }
   };
 
+  const isTelegramConnected = !!profile.telegramChatId;
+
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto space-y-8">
         <div>
           <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold text-primary mb-2 border border-primary/20">
             <ShieldCheck className="h-3 w-3" />
-            <span>Personal Edition • Single-User Mode Active</span>
+            <span>Personal Settings</span>
           </div>
           <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
             Account & Personal Assistant Settings
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Configure your student profile, attendance thresholds, 4:00 PM IST check-in triggers and notifications.
+            Configure your student profile, attendance thresholds, exam planner, and notifications.
           </p>
         </div>
 
@@ -345,46 +459,249 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* 4 PM Check-in & Notifications */}
-          <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-5">
-            <div className="flex items-center justify-between pb-2 border-b">
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-primary" />
-                <h2 className="font-bold text-sm text-foreground">Daily 4:00 PM Check-in & Alerts</h2>
-              </div>
-              <span className="rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-primary">
-                Asia/Kolkata
-              </span>
+          {/* Submit profile */}
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
+            >
+              {saving ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              <span>Save Profile</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Exam Planner Settings */}
+        <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b">
+            <Target className="h-4 w-4 text-primary" />
+            <h2 className="font-bold text-sm text-foreground">Exam Planner Identity</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Customize which exam you are preparing for. This updates the sidebar label and planner display.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Exam Type</label>
+              <select
+                value={gateSettings.examType}
+                onChange={(e) => handleExamTypeChange(e.target.value)}
+                className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+              >
+                <option>GATE CS</option>
+                <option>GATE DA</option>
+                <option>GATE ECE</option>
+                <option>GATE EE</option>
+                <option>GATE ME</option>
+                <option>GATE CE</option>
+                <option>UPSC</option>
+                <option>CAT</option>
+                <option>GRE</option>
+                <option>Custom</option>
+              </select>
             </div>
 
-            <div className="space-y-4 text-xs">
-              {/* Web Push */}
-              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 bg-muted/20">
-                <div className="space-y-1">
-                  <div className="font-bold text-foreground">Browser & Device Web Push</div>
-                  <p className="text-muted-foreground text-[11px]">
-                    Receive push notification prompt every day at 4:00 PM IST with your daily checklist.
-                  </p>
-                  <div className="text-[10px] text-muted-foreground">
-                    Current status: <strong>{pushStatus}</strong>
-                  </div>
-                </div>
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Target Year</label>
+              <select
+                value={gateSettings.targetYear}
+                onChange={(e) => handleTargetYearChange(Number(e.target.value))}
+                className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+              >
+                {[2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
 
-                <button
-                  type="button"
-                  onClick={handleRequestPushPermission}
-                  className="rounded-xl border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shrink-0 w-full xs:w-auto text-center"
-                >
-                  Enable Push
-                </button>
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Sidebar Label</label>
+              <input
+                type="text"
+                value={gateSettings.examLabel}
+                onChange={(e) => setGateSettings({ ...gateSettings, examLabel: e.target.value })}
+                placeholder="e.g. GATE CS 2027"
+                className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+              />
+              <p className="text-[10px] text-muted-foreground">This label appears in the sidebar and planner header.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Target Score</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={gateSettings.targetScore}
+                onChange={(e) => setGateSettings({ ...gateSettings, targetScore: Number(e.target.value) })}
+                className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
+              />
+              <p className="text-[10px] text-muted-foreground">Your target score out of 100 (GATE is out of 100 marks).</p>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              disabled={savingGate}
+              onClick={handleSaveGateSettings}
+              className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all disabled:opacity-50"
+            >
+              {savingGate ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save className="h-3.5 w-3.5" />}
+              Save Exam Settings
+            </button>
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="rounded-3xl border bg-card p-4 sm:p-6 shadow-sm space-y-5">
+          <div className="flex items-center justify-between pb-2 border-b">
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" />
+              <h2 className="font-bold text-sm text-foreground">Daily 4:00 PM Check-in & Alerts</h2>
+            </div>
+            <span className="rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-primary">
+              Asia/Kolkata
+            </span>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            {/* Web Push */}
+            <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 bg-muted/20">
+              <div className="space-y-1">
+                <div className="font-bold text-foreground">Browser & Device Web Push</div>
+                <p className="text-muted-foreground text-[11px]">
+                  Receive push notification prompt every day at 4:00 PM IST with your daily checklist.
+                </p>
+                <div className="text-[10px] text-muted-foreground">
+                  Current status: <strong>{pushStatus}</strong>
+                </div>
               </div>
 
-              {/* Telegram Integration */}
-              <div className="rounded-2xl border p-3.5 sm:p-4 bg-muted/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Send className="h-4 w-4 text-sky-500" />
-                    <span className="font-bold text-foreground">Telegram Alerts (Optional)</span>
+              <button
+                type="button"
+                onClick={handleRequestPushPermission}
+                className="rounded-xl border bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted shrink-0 w-full xs:w-auto text-center"
+              >
+                Enable Push
+              </button>
+            </div>
+
+            {/* Telegram Integration — Token-based linking */}
+            <div className="rounded-2xl border p-3.5 sm:p-4 bg-muted/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4 text-sky-500" />
+                  <span className="font-bold text-foreground">Telegram Notifications</span>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                    isTelegramConnected
+                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                      : "bg-muted text-muted-foreground border"
+                  }`}
+                >
+                  {isTelegramConnected ? "✓ Connected" : "Not Connected"}
+                </span>
+              </div>
+
+              {isTelegramConnected ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-3 py-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-foreground">Telegram linked</div>
+                      <div className="text-[10px] text-muted-foreground">Chat ID: {profile.telegramChatId}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={testingTelegram}
+                      onClick={handleSendTestTelegram}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-3.5 py-2 text-[11px] font-bold text-white disabled:opacity-50"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {testingTelegram ? "Sending..." : "Send Test Message"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={disconnecting}
+                      onClick={handleDisconnectTelegram}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 px-3.5 py-2 text-[11px] font-bold text-destructive disabled:opacity-50"
+                    >
+                      <Link2Off className="h-3.5 w-3.5" />
+                      {disconnecting ? "Disconnecting..." : "Disconnect Telegram"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-[11px]">
+                    Connect your personal Telegram to receive 4 PM attendance check-in reminders and exam planner alerts directly on your phone.
+                  </p>
+
+                  <div className="rounded-xl border bg-background p-3 space-y-2">
+                    <div className="font-semibold text-foreground text-[11px]">How to connect:</div>
+                    <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
+                      <li>Click <strong>"Generate Link Token"</strong> below</li>
+                      <li>Open Telegram and search for <strong>@{botUsername}</strong></li>
+                      <li>Send the command shown below to the bot</li>
+                      <li>Your Telegram will be linked instantly ✅</li>
+                    </ol>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={linkTokenLoading}
+                    onClick={handleGenerateLinkToken}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    {linkTokenLoading ? (
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    {linkTokenLoading ? "Generating..." : "Generate Link Token"}
+                  </button>
+
+                  {linkToken && (
+                    <div className="rounded-xl border bg-sky-500/5 border-sky-500/20 p-3 space-y-2">
+                      <div className="text-[11px] text-muted-foreground font-semibold">Send this command to the bot:</div>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded-lg bg-muted px-3 py-2 text-xs font-mono text-foreground">
+                          /link {linkToken}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={handleCopyToken}
+                          className="rounded-lg border p-2 hover:bg-muted transition-colors"
+                          title="Copy command"
+                        >
+                          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                      </div>
+                      {linkCopied && <p className="text-[10px] text-emerald-500">Copied to clipboard!</p>}
+                      <p className="text-[10px] text-amber-500">⏱ This token expires in 15 minutes.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Optional: Enable telegram toggle after connecting */}
+              {isTelegramConnected && (
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <div className="text-xs font-semibold text-foreground">Receive daily notifications</div>
+                    <p className="text-[10px] text-muted-foreground">Get 4 PM check-in reminders and alerts via Telegram</p>
                   </div>
                   <input
                     type="checkbox"
@@ -401,80 +718,51 @@ export default function SettingsPage() {
                     className="h-4 w-4 rounded accent-primary cursor-pointer"
                   />
                 </div>
+              )}
+            </div>
 
+            {/* Manual Checkin Test Trigger */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 bg-primary/5 border-primary/20">
+              <div className="space-y-1">
+                <div className="font-bold text-foreground">Test Daily 4:00 PM Check-in</div>
                 <p className="text-muted-foreground text-[11px]">
-                  Receive your 4 PM checklist and low attendance alerts directly to your Telegram handle or group.
+                  Simulate the automated 4:00 PM IST backend check-in engine right now.
                 </p>
-
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-1">
-                    <label className="font-semibold text-foreground">Telegram Chat ID</label>
-                    {profile.telegramChatId && (
-                      <button
-                        type="button"
-                        disabled={testingTelegram}
-                        onClick={handleSendTestTelegram}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 hover:underline disabled:opacity-50"
-                      >
-                        {testingTelegram ? "Sending..." : "Send Test Alert 🚀"}
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={profile.telegramChatId}
-                    onChange={(e) => setProfile({ ...profile, telegramChatId: e.target.value })}
-                    placeholder="e.g. 123456789"
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-foreground focus:outline-none"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Message your bot or <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-primary underline">@userinfobot</a> on Telegram to get your numeric Chat ID.
-                  </p>
-                </div>
               </div>
 
-              {/* Manual Checkin Test Trigger */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 bg-primary/5 border-primary/20">
-                <div className="space-y-1">
-                  <div className="font-bold text-foreground">Test Daily 4:00 PM Check-in</div>
-                  <p className="text-muted-foreground text-[11px]">
-                    Simulate the automated 4:00 PM IST backend check-in engine right now.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={testCronRunning}
-                  onClick={handleTriggerTestCheckin}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 shrink-0"
-                >
-                  {testCronRunning ? (
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <PlayCircle className="h-4 w-4" />
-                  )}
-                  <span>Trigger Now</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={testCronRunning}
+                onClick={handleTriggerTestCheckin}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 shrink-0"
+              >
+                {testCronRunning ? (
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <PlayCircle className="h-4 w-4" />
+                )}
+                <span>Trigger Now</span>
+              </button>
             </div>
           </div>
+        </div>
 
-          {/* Submit */}
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
-            >
-              {saving ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              <span>Save Settings</span>
-            </button>
-          </div>
-        </form>
+        {/* Save profile button for notification preferences */}
+        <div className="flex justify-end pb-8">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSaveProfile as any}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 transition-all disabled:opacity-50"
+          >
+            {saving ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            <span>Save Notification Preferences</span>
+          </button>
+        </div>
       </div>
     </AppLayout>
   );
