@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       const absent = countMap[`${subId}_Absent`] || 0;
       const cancelled = countMap[`${subId}_Cancelled`] || 0;
       const pending = countMap[`${subId}_Pending`] || 0;
-      const target = sub.minAttendanceThreshold || defaultTarget;
+      const target = Math.max(defaultTarget, sub.minAttendanceThreshold || defaultTarget);
 
       return calculateSubjectMetrics({
         subjectId: subId,

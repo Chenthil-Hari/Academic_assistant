@@ -24,13 +24,13 @@ export async function GET(req: NextRequest) {
 
     const [pendingUsers, approvedUsers, rejectedUsers] = await Promise.all([
       User.find({ status: "pending" })
-        .select("-passwordHash -resetPasswordToken")
+        .select("-passwordHash -resetPasswordToken -resetPasswordExpires -telegramLinkToken -telegramLinkTokenExpires")
         .sort({ createdAt: -1 }),
       User.find({ status: "approved" })
-        .select("-passwordHash -resetPasswordToken")
+        .select("-passwordHash -resetPasswordToken -resetPasswordExpires -telegramLinkToken -telegramLinkTokenExpires")
         .sort({ approvedAt: -1, createdAt: -1 }),
       User.find({ status: "rejected" })
-        .select("-passwordHash -resetPasswordToken")
+        .select("-passwordHash -resetPasswordToken -resetPasswordExpires -telegramLinkToken -telegramLinkTokenExpires")
         .sort({ rejectedAt: -1, createdAt: -1 }),
     ]);
 

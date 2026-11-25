@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
     }
 
     await connectToDatabase();
-    const userDoc = await User.findById(user.userId).select("-passwordHash");
+    const userDoc = await User.findById(user.userId).select(
+      "-passwordHash -resetPasswordToken -resetPasswordExpires -telegramLinkToken -telegramLinkTokenExpires"
+    );
     if (!userDoc) {
       return NextResponse.json(
         { success: false, message: "User not found." },

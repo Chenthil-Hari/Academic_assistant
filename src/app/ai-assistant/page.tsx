@@ -45,6 +45,31 @@ const QUICK_PROMPTS = [
   "Summarize my academic week.",
 ];
 
+function renderFormattedMessage(text: string): React.ReactNode {
+  const lines = text.split("\n");
+  return lines.map((line, lineIdx) => {
+    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+    return (
+      <React.Fragment key={lineIdx}>
+        {parts.map((part, pIdx) => {
+          if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+            return <strong key={pIdx} className="font-bold">{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+            return (
+              <code key={pIdx} className="rounded bg-background/80 px-1.5 py-0.5 font-mono text-[11px] border">
+                {part.slice(1, -1)}
+              </code>
+            );
+          }
+          return <React.Fragment key={pIdx}>{part}</React.Fragment>;
+        })}
+        {lineIdx < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+}
+
 function AssistantChat() {
   const { actualTheme } = useTheme();
   const searchParams = useSearchParams();
@@ -56,7 +81,7 @@ function AssistantChat() {
     {
       role: "assistant",
       content:
-        "👋 **Welcome to Academic AI Assistant!**\n\nI am your dedicated academic operating system. You can ask me **all details and information** related to you from the website:\n\n• 👤 **Profile & Identity**: Roll number, college, branch, semester, settings\n• 📚 **Academics**: Enrolled subjects, credits, faculty, weekly timetable\n• 📅 **Schedule**: Today's classes, live running class, tomorrow's schedule\n• 📊 **Attendance & Bunks**: Current percentages, bunk limits, semester predictions\n• 🎉 **Calendar**: Upcoming exams, assignment deadlines, holidays (Pongal, etc.)\n• 📑 **Uploaded PDFs**: Timetable and calendar files\n\nAsk me anything or pick a quick prompt below!",
+        "👋 **Welcome to Academic AI Assistant!**\n\nI am your dedicated academic operating system. You can ask me **all details and information** related to you from the website:\n\n• 👤 **Profile & Identity**: Roll number, college, branch, semester, settings\n• 📚 **Academics**: Enrolled subjects, credits, faculty, weekly timetable\n• 📅 **Schedule**: Today's classes, live running class, tomorrow's schedule\n• 📊 **Attendance & Bunks**: Current percentages, bunk limits, semester predictions\n• 🎉 **Calendar**: Upcoming exams, assignment deadlines, and holidays\n• 📑 **Uploaded PDFs**: Timetable and calendar files\n\nAsk me anything or pick a quick prompt below!",
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
@@ -269,7 +294,7 @@ function AssistantChat() {
       </div>
 
       {/* Main Chat Pane */}
-      <div className="flex flex-1 min-w-0 flex-col rounded-3xl border bg-card/80 shadow-sm backdrop-blur-md overflow-hidden">
+      <div className="flex flex-1 min-w-0 min-h-0 flex-col rounded-3xl border bg-card/80 shadow-sm backdrop-blur-md overflow-hidden">
         {/* Chat Header */}
         <div className="flex items-center justify-between border-b px-4 sm:px-6 py-3.5 sm:py-4">
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -287,7 +312,7 @@ function AssistantChat() {
                 </span>
               </div>
               <p className="text-[10px] sm:text-[11px] text-muted-foreground line-clamp-1">
-                Zero hallucination • MongoDB queries
+                Verified live academic records
               </p>
             </div>
           </div>
@@ -346,7 +371,7 @@ function AssistantChat() {
                   </div>
                 )}
 
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                <div className="break-words">{renderFormattedMessage(m.content)}</div>
 
                 {m.timestamp && (
                   <div
@@ -421,6 +446,7 @@ function AssistantChat() {
               />
               <button
                 type="submit"
+                aria-label="Send message"
                 disabled={loading || !inputMessage.trim()}
                 className="absolute right-1.5 sm:right-2 rounded-xl bg-primary p-2 text-primary-foreground shadow-sm hover:bg-primary/90 transition-all disabled:opacity-40 z-10"
               >

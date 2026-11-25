@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { verifyToken } from "@/lib/auth/jwt";
 import {
   GraduationCap,
   Sparkles,
@@ -11,11 +12,13 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   const cookieStore = cookies();
   const token = cookieStore.get("academic_ai_token");
 
-  if (token?.value) {
+  if (token?.value && verifyToken(token.value)) {
     redirect("/dashboard");
   }
 

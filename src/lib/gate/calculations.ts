@@ -351,21 +351,30 @@ export function calculateGateWorkload(params: {
   const recommendations: string[] = [];
   let feasibilityVerdict = "";
 
+  const deadlineLabel = new Date(deadline).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
   if (isFeasibleByDeadline) {
-    feasibilityVerdict = `✅ On Track: You have ${totalAvailableStudyHours} study hours available vs ${totalRemainingHours.toFixed(1)} remaining lecture hours.`;
+    feasibilityVerdict = `✅ On Track: You have ${totalAvailableStudyHours} study hours available vs ${totalRemainingHours.toFixed(1)} remaining study hours.`;
     recommendations.push(
-      "Maintain your steady 10 hours/day schedule. Reserve Sundays for active recall and revision.",
-      "High-priority subjects will finish comfortably before the December 31 deadline.",
-      "You will be ready to transition directly into Phase 2 (PYQ Practice) on January 1, 2027!"
+      `Maintain your steady ${dailyStudyHours} hours/day schedule. Reserve rest days for active recall and revision.`,
+      `High-priority subjects will finish comfortably before your ${deadlineLabel} deadline.`,
+      "You will be ready to transition smoothly into Phase 2 (PYQ & Mock Practice)!"
     );
   } else {
-    feasibilityVerdict = `⚠️ Workload Deficit of ${workloadGapHours.toFixed(1)} Hours: ${totalRemainingHours.toFixed(1)} total lecture hours needed, but only ${totalAvailableStudyHours} effective hours available (at 10h/day for ${effectiveStudyDays} study days).`;
+    const highPriDaily = Number((highPriorityRemainingHours / (effectiveStudyDays || 1)).toFixed(1));
+    feasibilityVerdict = `⚠️ Workload Deficit of ${workloadGapHours.toFixed(1)} Hours: ${totalRemainingHours.toFixed(1)} total study hours needed, but only ${totalAvailableStudyHours} effective hours available (at ${dailyStudyHours}h/day for ${effectiveStudyDays} study days).`;
 
     recommendations.push(
-      `🎯 Priority Focus: High-Priority subjects require ${highPriorityRemainingHours.toFixed(1)} hours. Completing High-Priority subjects first ensures core scoring coverage before Dec 31.`,
-      `⏩ Playback Acceleration: Watching lectures at 1.25x reduces required time to ${(totalRemainingHours / 1.25).toFixed(1)} hrs (saving ${(totalRemainingHours - totalRemainingHours / 1.25).toFixed(1)} hrs); 1.5x reduces it to ${(totalRemainingHours / 1.5).toFixed(1)} hrs.`,
-      `📦 Defer Low-Priority Subjects: Deprioritized subjects (Compiler Design, separate C Programming, Verbal Aptitude) account for ${lowPriorityRemainingHours.toFixed(1)} hours. Deferring them to January allows you to complete the core syllabus easily.`,
-      `⚡ Daily Target: To finish ALL remaining lectures by Dec 31, you would need ${dailyRequiredLectureHours.toFixed(1)} hours/day (exceeding your 10h/day cap). Sticking strictly to High-Priority subjects requires ${(highPriorityRemainingHours / (effectiveStudyDays || 1)).toFixed(1)} hours/day, which is well within your 10h budget!`
+      `🎯 Priority Focus: High-Priority subjects require ${highPriorityRemainingHours.toFixed(1)} hours. Completing High-Priority subjects first ensures core scoring coverage before ${deadlineLabel}.`,
+      `⏩ Pacing & Acceleration: Increasing study efficiency by 25% reduces required time to ${(totalRemainingHours / 1.25).toFixed(1)} hrs (saving ${(totalRemainingHours - totalRemainingHours / 1.25).toFixed(1)} hrs).`,
+      `📦 Defer Low-Priority Subjects: Low-priority subjects account for ${lowPriorityRemainingHours.toFixed(1)} hours. Deferring them lets you focus on core high-weightage topics first.`,
+      highPriDaily <= dailyStudyHours
+        ? `⚡ Daily Target: Completing ALL remaining units by ${deadlineLabel} requires ${dailyRequiredLectureHours.toFixed(1)} hours/day (above your ${dailyStudyHours}h/day cap). Focusing strictly on High-Priority subjects requires ${highPriDaily} hours/day, which fits within your ${dailyStudyHours}h/day budget!`
+        : `⚡ Daily Target: Completing ALL units by ${deadlineLabel} requires ${dailyRequiredLectureHours.toFixed(1)} hours/day, and even High-Priority subjects alone require ${highPriDaily} hours/day (above your ${dailyStudyHours}h/day cap). Consider increasing daily hours, prioritizing key topics, or extending your deadline.`
     );
   }
 
