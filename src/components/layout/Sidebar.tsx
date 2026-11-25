@@ -53,10 +53,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       const res = await fetch("/api/gate/settings");
       const data = await res.json();
       if (data.success && data.settings) {
-        const label = data.settings.examLabel || "GATE 2027";
-        const type = data.settings.examType || "GATE";
-        setExamLabel(label);
-        setExamBadge(type.split(" ")[0].toUpperCase().slice(0, 6) || "EXAM");
+        if (data.settings.isConfigured === false) {
+          setExamLabel("Exam");
+          setExamBadge("PLAN");
+        } else {
+          const label = data.settings.examLabel || "Exam";
+          const type = data.settings.examType || "EXAM";
+          setExamLabel(label);
+          setExamBadge(type.split(" ")[0].toUpperCase().slice(0, 6) || "EXAM");
+        }
       }
     } catch (err) {
       // ignore

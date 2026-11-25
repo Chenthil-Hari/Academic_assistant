@@ -8,6 +8,7 @@ export interface IGateUserSettings extends Document {
   targetYear: number; // e.g. 2027
   targetScore: number; // e.g. 65 (out of 100 for GATE)
   studyStyle: "videos" | "chapters" | "topics" | "problems" | "hours"; // preparation style per user
+  isConfigured: boolean; // false for new users until they set their target & study style
   dailyStudyHours: number; // default: 10
   studyDaysPerWeek: number; // default: 6
   restDayOfWeek: number; // default: 0 (Sunday)
@@ -56,6 +57,10 @@ const GateUserSettingsSchema = new Schema<IGateUserSettings>(
       type: String,
       enum: ["videos", "chapters", "topics", "problems", "hours"],
       default: "videos",
+    },
+    isConfigured: {
+      type: Boolean,
+      default: false,
     },
     dailyStudyHours: {
       type: Number,

@@ -42,11 +42,12 @@ export async function GET(req: NextRequest) {
       const isHari = user.email?.toLowerCase() === "chenthilhari@gmail.com";
       settings = await GateUserSettings.create({
         userId: userObjectId,
-        examType: isHari ? "GATE CS" : "GATE",
-        examLabel: isHari ? "GATE 2027" : "Exam 2027",
-        targetYear: 2027,
+        examType: isHari ? "GATE CS" : "",
+        examLabel: isHari ? "GATE 2027" : "Exam Planner",
+        targetYear: new Date().getFullYear() + 1,
         targetScore: 65,
         studyStyle: isHari ? "videos" : "topics",
+        isConfigured: isHari,
         dailyStudyHours: isHari ? 10 : 6,
         studyDaysPerWeek: 6,
         restDayOfWeek: 0,
@@ -93,6 +94,7 @@ export async function GET(req: NextRequest) {
       workload,
       settings: {
         ...settings.toObject(),
+        isConfigured: Boolean(settings.isConfigured || subjects.length > 0),
         currentPhase: effectivePhase,
       },
       todayStats: {

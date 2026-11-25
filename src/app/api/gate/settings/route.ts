@@ -86,6 +86,7 @@ export async function PUT(req: NextRequest) {
     if (body.playbackSpeed !== undefined) {
       settings.playbackSpeed = Math.max(0.5, Math.min(3.0, Number(body.playbackSpeed)));
     }
+    settings.isConfigured = true;
 
     await settings.save();
 
